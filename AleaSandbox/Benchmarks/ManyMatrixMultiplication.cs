@@ -120,7 +120,7 @@ namespace AleaSandbox.Benchmarks
 
                         gpu.Synchronize();
 
-                        PrintPerformance(timer, "MatrixMultiplication.cuBLAS", m * n, n, n);
+                        PrintPerformance(timer, "ManyMatrixMultiplication.cuBLAS", m * n, n, n);
 
                         Gpu.Copy(cudaResult, result);
                     }

@@ -1,6 +1,6 @@
 ﻿using System;
 using AleaSandbox.Benchmarks;
-
+using ILGPU.Runtime.Cuda;
 #if DOUBLE_PRECISION
     using Real = System.Double;
 #else
@@ -18,11 +18,14 @@ namespace AleaSandbox
                 Alea.Device.Default.Print();
                 Console.WriteLine();
 
-                RunAddVector();
-                RunIntraReturn();
-                RunSquaredDistance();
-                RunMatrixMultiplication();
-                RunManyMatrixMultiplication();
+                using var context = new ILGPU.Context();
+                var ilGpu = new CudaAccelerator(context);
+
+                RunAddVector(ilGpu);
+                //RunIntraReturn(ilGpu);
+                //RunSquaredDistance();
+                //RunMatrixMultiplication();
+                //RunManyMatrixMultiplication();
             }
 
             catch (Exception exception)
@@ -35,7 +38,7 @@ namespace AleaSandbox
             }
         }
 
-        private static void RunAddVector()
+        private static void RunAddVector(CudaAccelerator ilGpu)
         {
             const int m = 24 * 12;
             const int n = 25600 - 1;
@@ -49,10 +52,11 @@ namespace AleaSandbox
                 () => AddVector.Initialise(matrixC, vector, m, n),
                 () => AssertAreEqual(matrixM, matrixC, m, n),
                 () => AddVector.Managed(matrixM, vector, m, n),
-                () => AddVector.Cuda(matrixC, vector, m, n));
+                () => AddVector.Alea(matrixC, vector, m, n),
+                () => AddVector.IlGpu(ilGpu, matrixC, vector, m, n));
         }
 
-        private static void RunIntraReturn()
+        private static void RunIntraReturn(CudaAccelerator ilGpu)
         {
             const int m = 24 * 12;
             const int n = 25600 - 1;
@@ -68,7 +72,8 @@ namespace AleaSandbox
                 () => IntraReturn.Initialise(matrixC, vector1, vector2, vector3, m, n),
                 () => AssertAreEqual(matrixM, matrixC, m, n),
                 () => IntraReturn.Managed(matrixM, vector1, vector2, vector3, m, n),
-                () => IntraReturn.Cuda(matrixC, vector1, vector2, vector3, m, n));
+                () => IntraReturn.Alea(matrixC, vector1, vector2, vector3, m, n),
+                () => IntraReturn.IlGpu(ilGpu, matrixC, vector1, vector2, vector3, m, n));
         }
 
         private static void RunSquaredDistance()

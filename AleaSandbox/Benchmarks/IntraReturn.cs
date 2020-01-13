@@ -3,6 +3,9 @@ using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using Alea;
 using Alea.CSharp;
+using ILGPU;
+using ILGPU.Runtime;
+using ILGPU.Runtime.Cuda;
 
 #if DOUBLE_PRECISION
     using Real = System.Double;
@@ -63,7 +66,7 @@ namespace AleaSandbox.Benchmarks
             Util.PrintPerformance(timer, "IntraReturn.Managed", 5, m, n);
         }
 
-        public static void Cuda(
+        public static void Alea(
             Real[] mIntraReturn,
             Real[] vClose,
             Real[] vIsAlive,
@@ -84,16 +87,52 @@ namespace AleaSandbox.Benchmarks
                 var gridSizeY = Util.DivUp(m, 8);
                 var lp = new LaunchParam(new dim3(gridSizeX, gridSizeY), new dim3(32, 8));
 
-                gpu.Launch(CudaKernel, lp, cudaIntraReturn.Ptr, cudaClose.Ptr, cudaIsAlive.Ptr, cudaIsValidDay.Ptr, m, n);
+                gpu.Launch(AleaKernel, lp, cudaIntraReturn.Ptr, cudaClose.Ptr, cudaIsAlive.Ptr, cudaIsValidDay.Ptr, m, n);
 
                 gpu.Synchronize();
-                Util.PrintPerformance(timer, "IntraReturn.Cuda", 5, m, n);
+                Util.PrintPerformance(timer, "IntraReturn.Alea", 5, m, n);
 
                 Gpu.Copy(cudaIntraReturn, mIntraReturn);
             }
         }
 
-        private static void CudaKernel(
+        public static void IlGpu(
+            CudaAccelerator gpu,
+            Real[] mIntraReturn,
+            Real[] vClose,
+            Real[] vIsAlive,
+            Real[] vIsValidDay,
+            int m,
+            int n)
+        {
+            using (var cudaIntraReturn = gpu.Allocate<Real>(mIntraReturn.Length))
+            using (var cudaClose = gpu.Allocate<Real>(vClose.Length))
+            using (var cudaIsAlive = gpu.Allocate<Real>(vIsAlive.Length))
+            using (var cudaIsValidDay = gpu.Allocate<Real>(vIsValidDay.Length))
+            {
+                cudaIntraReturn.CopyFrom(mIntraReturn, 0, 0, mIntraReturn.Length);
+                cudaClose.CopyFrom(vClose, 0, 0, vClose.Length);
+                cudaIsAlive.CopyFrom(vIsAlive, 0, 0, vIsAlive.Length);
+                cudaIsValidDay.CopyFrom(vIsValidDay, 0, 0, vIsValidDay.Length);
+
+                var timer = Stopwatch.StartNew();
+
+                var gridSizeX = Util.DivUp(n, 32);
+                var gridSizeY = Util.DivUp(m, 8);
+                var lp = new GroupedIndex2(new Index2(gridSizeX, gridSizeY), new Index2(32, 8));
+
+                var kernel = gpu.LoadStreamKernel<
+                    GroupedIndex2, ArrayView<Real>, ArrayView<Real>, ArrayView<Real>, ArrayView<Real>, int, int>(IlGpuKernel);
+                kernel(lp, cudaIntraReturn.View, cudaClose.View, cudaIsAlive.View, cudaIsValidDay.View, m, n);
+
+                gpu.Synchronize();
+                Util.PrintPerformance(timer, "IntraReturn.IlGpu", 5, m, n);
+
+                cudaIntraReturn.CopyTo(mIntraReturn, 0, 0, mIntraReturn.Length);
+            }
+        }
+
+        private static void AleaKernel(
             deviceptr<Real> mIntraReturn,
             deviceptr<Real> vClose,
             deviceptr<Real> vIsAlive,
@@ -111,7 +150,30 @@ namespace AleaSandbox.Benchmarks
                 var isValidDay = vIsValidDay[j];
                 var current = mIntraReturn[i * n + j];
 
-                mIntraReturn[i * n + j] = close > 0 ? MaskCuda((current - close) / close) * isAlive * isValidDay : 0;
+                mIntraReturn[i * n + j] = close > 0 ? MaskAlea((current - close) / close) * isAlive * isValidDay : 0;
+            }
+        }
+
+        private static void IlGpuKernel(
+            GroupedIndex2 index,
+            ArrayView<Real> mIntraReturn,
+            ArrayView<Real> vClose,
+            ArrayView<Real> vIsAlive,
+            ArrayView<Real> vIsValidDay,
+            int m,
+            int n)
+        {
+            var i = Grid.IndexY * Group.DimensionY + Group.IndexY;
+            var j = Grid.IndexX * Group.DimensionX + Group.IndexX;
+
+            if (i < m && j < n)
+            {
+                var close = vClose[j];
+                var isAlive = vIsAlive[j];
+                var isValidDay = vIsValidDay[j];
+                var current = mIntraReturn[i * n + j];
+
+                mIntraReturn[i * n + j] = close > 0 ? MaskIlGpu((current - close) / close) * isAlive * isValidDay : 0;
             }
         }
 
@@ -122,9 +184,16 @@ namespace AleaSandbox.Benchmarks
             return value * 0 == 0 ? value : 0;
         }
 
-        private static Real MaskCuda(Real value)
+        private static Real MaskAlea(Real value)
         {
             return LibDevice.__nv_isfinited(value) != 0 ? value : 0;
+        }
+
+        private static Real MaskIlGpu(Real value)
+        {
+            // TODO figure out access to CUDA intrinsics
+            // ReSharper disable once CompareOfFloatsByEqualityOperator
+            return value * 0 == 0 ? value : 0;
         }
     }
 }

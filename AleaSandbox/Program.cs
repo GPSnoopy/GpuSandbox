@@ -22,10 +22,10 @@ namespace AleaSandbox
                 var ilGpu = new CudaAccelerator(context);
 
                 RunAddVector(ilGpu);
-                //RunIntraReturn(ilGpu);
-                //RunSquaredDistance();
-                //RunMatrixMultiplication();
-                //RunManyMatrixMultiplication();
+                RunIntraReturn(ilGpu);
+                RunSquaredDistance();
+                RunMatrixMultiplication();
+                RunManyMatrixMultiplication();
             }
 
             catch (Exception exception)

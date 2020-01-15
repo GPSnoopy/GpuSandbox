@@ -67,6 +67,7 @@ namespace AleaSandbox.Benchmarks
         }
 
         public static void Alea(
+            Gpu gpu, 
             Real[] mIntraReturn,
             Real[] vClose,
             Real[] vIsAlive,
@@ -74,8 +75,6 @@ namespace AleaSandbox.Benchmarks
             int m,
             int n)
         {
-            var gpu = Gpu.Default;
-
             using (var cudaIntraReturn = gpu.AllocateDevice(mIntraReturn))
             using (var cudaClose = gpu.AllocateDevice(vClose))
             using (var cudaIsAlive = gpu.AllocateDevice(vIsAlive))

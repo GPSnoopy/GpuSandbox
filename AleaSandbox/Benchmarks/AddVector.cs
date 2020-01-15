@@ -38,10 +38,8 @@ namespace AleaSandbox.Benchmarks
             Util.PrintPerformance(timer, "AddVector.Managed", 3, m, n);
         }
 
-        public static void Alea(Real[] matrix, Real[] vector, int m, int n)
+        public static void Alea(Gpu gpu, Real[] matrix, Real[] vector, int m, int n)
         {
-            var gpu = Gpu.Default;
-
             using (var cudaMatrix = gpu.AllocateDevice(matrix))
             using (var cudaVector = gpu.AllocateDevice(vector))
             {

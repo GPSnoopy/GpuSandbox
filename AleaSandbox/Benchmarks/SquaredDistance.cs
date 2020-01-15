@@ -2,6 +2,9 @@
 using System.Diagnostics;
 using Alea;
 using Alea.CSharp;
+using ILGPU;
+using ILGPU.Runtime;
+using ILGPU.Runtime.Cuda;
 
 #if DOUBLE_PRECISION
     using Real = System.Double;
@@ -24,7 +27,7 @@ namespace AleaSandbox.Benchmarks
 
             for (int i = 0; i != c * n; ++i)
             {
-                mCoordinates[i] = (Real)rand.NextDouble();
+                mCoordinates[i] = (Real) rand.NextDouble();
             }
         }
 
@@ -58,14 +61,13 @@ namespace AleaSandbox.Benchmarks
             Util.PrintPerformance(timer, "SquaredDistance.Managed", n, c, n);
         }
 
-        public static void Cuda(
+        public static void Alea(
+            Gpu gpu,
             Real[] mSquaredDistances,
             Real[] mCoordinates,
             int c,
             int n)
         {
-            var gpu = Gpu.Default;
-
             using (var cudaSquaredDistance = gpu.AllocateDevice(mSquaredDistances))
             using (var cudaCoordinates = gpu.AllocateDevice(mCoordinates))
             {
@@ -76,25 +78,57 @@ namespace AleaSandbox.Benchmarks
                 var gridSize = Util.DivUp(n * n, blockSize);
                 var lp = new LaunchParam(gridSize, blockSize);
 
-                gpu.Launch(Kernel, lp, cudaSquaredDistance.Ptr, cudaCoordinates.Ptr, c, n);
+                gpu.Launch(AleaKernel, lp, cudaSquaredDistance.Ptr, cudaCoordinates.Ptr, c, n);
 
                 gpu.Synchronize();
-                Util.PrintPerformance(timer, "SquaredDistance.Cuda", n, c, n);
+                Util.PrintPerformance(timer, "SquaredDistance.Alea", n, c, n);
 
                 Gpu.Copy(cudaSquaredDistance, mSquaredDistances);
             }
         }
 
-        public static void CudaSharedMemory(
+        public static void IlGpu(
+            CudaAccelerator gpu,
             Real[] mSquaredDistances,
             Real[] mCoordinates,
             int c,
             int n)
         {
-            CudaOptimisedImpl(mSquaredDistances, mCoordinates, c, n, "SquaredDistance.CudaSharedMemory", KernelSharedMemory, i => i);
+            using (var cudaSquaredDistance = gpu.Allocate<Real>(mSquaredDistances.Length))
+            using (var cudaCoordinates = gpu.Allocate<Real>(mCoordinates.Length))
+            {
+                cudaSquaredDistance.CopyFrom(mSquaredDistances, 0, 0, mSquaredDistances.Length);
+                cudaCoordinates.CopyFrom(mCoordinates, 0, 0, mCoordinates.Length);
+
+                var timer = Stopwatch.StartNew();
+
+                const int blockSize = 128;
+
+                var gridSize = Util.DivUp(n * n, blockSize);
+                var lp = new GroupedIndex(gridSize, blockSize);
+
+                var kernel = gpu.LoadStreamKernel<GroupedIndex, ArrayView<Real>, ArrayView<Real>, int, int>(IlGpuKernel);
+                kernel(lp, cudaSquaredDistance.View, cudaCoordinates.View, c, n);
+
+                gpu.Synchronize();
+                Util.PrintPerformance(timer, "SquaredDistance.IlGpu", n, c, n);
+
+                cudaSquaredDistance.CopyTo(mSquaredDistances, 0, 0, mSquaredDistances.Length);
+            }
         }
 
-        public static void CudaFloat2(
+        public static void AleaSharedMemory(
+            Gpu gpu,
+            Real[] mSquaredDistances,
+            Real[] mCoordinates,
+            int c,
+            int n)
+        {
+            AleaOptimisedImpl(gpu, mSquaredDistances, mCoordinates, c, n, "SquaredDistance.AleaSharedMemory", AleaKernelSharedMemory, i => i);
+        }
+
+        public static void AleaFloat2(
+            Gpu gpu,
             Real[] mSquaredDistances,
             Real[] mCoordinates,
             int c,
@@ -102,10 +136,11 @@ namespace AleaSandbox.Benchmarks
         {
             if (n % 2 != 0) throw new ArgumentException("n must be a multiple of 2");
 
-            CudaOptimisedImpl(mSquaredDistances, mCoordinates, c, n, "SquaredDistance.CudaFloat2", KernelFloat2, i => i);
+            AleaOptimisedImpl(gpu, mSquaredDistances, mCoordinates, c, n, "SquaredDistance.AleaFloat2", AleaKernelFloat2, i => i);
         }
 
-        public static void CudaConstants(
+        public static void AleaConstants(
+            Gpu gpu, 
             Real[] mSquaredDistances,
             Real[] mCoordinates,
             int c,
@@ -113,10 +148,11 @@ namespace AleaSandbox.Benchmarks
         {
             if (n % 2 != 0) throw new ArgumentException("n must be a multiple of 2");
 
-            CudaOptimisedImpl(mSquaredDistances, mCoordinates, c, n, "SquaredDistance.CudaConstants", KernelConstants, Gpu.Constant);
+            AleaOptimisedImpl(gpu, mSquaredDistances, mCoordinates, c, n, "SquaredDistance.AleaConstants", AleaKernelConstants, Gpu.Constant);
         }
 
-        public static void CudaLocalMemory(
+        public static void AleaLocalMemory(
+            Gpu gpu, 
             Real[] mSquaredDistances,
             Real[] mCoordinates,
             int c,
@@ -124,20 +160,19 @@ namespace AleaSandbox.Benchmarks
         {
             if (n % 2 != 0) throw new ArgumentException("n must be a multiple of 2");
 
-            CudaOptimisedImpl(mSquaredDistances, mCoordinates, c, n, "SquaredDistance.LocalMemory", KernelLocalMemory);
+            AleaOptimisedImpl(gpu, mSquaredDistances, mCoordinates, c, n, "SquaredDistance.AleaLocalMemory", AleaKernelLocalMemory);
         }
 
-        private static void CudaOptimisedImpl<TInt>(
+        private static void AleaOptimisedImpl<TInt>(
+            Gpu gpu,
             Real[] mSquaredDistances,
             Real[] mCoordinates,
             int c,
             int n,
             string name,
-            Action<deviceptr<float>, deviceptr<float>, TInt, int, int> kernel,
+            Action<deviceptr<Real>, deviceptr<Real>, TInt, int, int> kernel,
             Func<int, TInt> numCoordGetter)
         {
-            var gpu = Gpu.Default;
-
             using (var cudaSquaredDistance = gpu.AllocateDevice<Real>(n, n))
             using (var cudaCoordinates = gpu.AllocateDevice(mCoordinates))
             {
@@ -157,16 +192,15 @@ namespace AleaSandbox.Benchmarks
             }
         }
 
-        private static void CudaOptimisedImpl(
+        private static void AleaOptimisedImpl(
+            Gpu gpu,
             Real[] mSquaredDistances,
             Real[] mCoordinates,
             int c,
             int n,
             string name,
-            Action<deviceptr<float>, deviceptr<float>, Constant<int>, Constant<int>, int, int> kernel)
+            Action<deviceptr<Real>, deviceptr<Real>, Constant<int>, Constant<int>, int, int> kernel)
         {
-            var gpu = Gpu.Default;
-
             using (var cudaSquaredDistance = gpu.AllocateDevice<Real>(n, n))
             using (var cudaCoordinates = gpu.AllocateDevice(mCoordinates))
             {
@@ -186,7 +220,7 @@ namespace AleaSandbox.Benchmarks
             }
         }
 
-        private static void Kernel(
+        private static void AleaKernel(
             deviceptr<Real> mSquaredDistances,
             deviceptr<Real> mCoordinates,
             int c,
@@ -214,7 +248,36 @@ namespace AleaSandbox.Benchmarks
             }
         }
 
-        private static void KernelSharedMemory(
+        private static void IlGpuKernel(
+            GroupedIndex index,
+            ArrayView<Real> mSquaredDistances,
+            ArrayView<Real> mCoordinates,
+            int c,
+            int n)
+        {
+            var j = Grid.IndexX * Group.DimensionX + Group.IndexX;
+
+            if (j < n)
+            {
+                for (int i = 0; i < n; ++i)
+                {
+                    Real dist = 0;
+
+                    for (int k = 0; k != c; ++k)
+                    {
+                        var coord1 = mCoordinates[k * n + i];
+                        var coord2 = mCoordinates[k * n + j];
+                        var diff = coord1 - coord2;
+
+                        dist += diff * diff;
+                    }
+
+                    mSquaredDistances[i * n + j] = dist;
+                }
+            }
+        }
+
+        private static void AleaKernelSharedMemory(
             deviceptr<Real> mSquaredDistances,
             deviceptr<Real> mCoordinates,
             int c,
@@ -278,7 +341,7 @@ namespace AleaSandbox.Benchmarks
             }
         }
 
-        private static void KernelFloat2(
+        private static void AleaKernelFloat2(
             deviceptr<Real> mSquaredDistances,
             deviceptr<Real> mCoordinates,
             int c,
@@ -337,7 +400,7 @@ namespace AleaSandbox.Benchmarks
             }
         }
 
-        private static void KernelConstants(
+        private static void AleaKernelConstants(
             deviceptr<Real> mSquaredDistances,
             deviceptr<Real> mCoordinates,
             Constant<int> c,
@@ -396,7 +459,7 @@ namespace AleaSandbox.Benchmarks
             }
         }
 
-        private static void KernelLocalMemory(
+        private static void AleaKernelLocalMemory(
             deviceptr<Real> mSquaredDistances,
             deviceptr<Real> mCoordinates,
             Constant<int> dimX,

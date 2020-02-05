@@ -27,7 +27,7 @@ namespace AleaSandbox
                 RunAddVector(aleaGpu, ilGpu);
                 RunIntraReturn(aleaGpu, ilGpu);
                 RunSquaredDistance(aleaGpu, ilGpu);
-                RunMatrixMultiplication();
+                RunMatrixMultiplication(aleaGpu, ilGpu);
                 RunManyMatrixMultiplication();
 
                 // ILGPU remarks:
@@ -106,7 +106,7 @@ namespace AleaSandbox
                 () => SquaredDistance.AleaLocalMemory(aleaGpu, matrixC, coordinates, c, x));
         }
 
-        private static void RunMatrixMultiplication()
+        private static void RunMatrixMultiplication(Gpu aleaGpu, CudaAccelerator ilGpu)
         {
             const int n = 1500 - 1;
 
@@ -120,7 +120,8 @@ namespace AleaSandbox
                 () => MatrixMultiplication.Initialise(left, right, n),
                 () => AssertAreEqual(resultM, resultC, n, n),
                 () => MatrixMultiplication.Managed(resultM, left, right, n),
-                () => MatrixMultiplication.Cuda(resultC, left, right, n));
+                () => MatrixMultiplication.Alea(aleaGpu, resultC, left, right, n),
+                () => MatrixMultiplication.IlGpu(ilGpu, resultC, left, right, n));
         }
 
         private static void RunManyMatrixMultiplication()

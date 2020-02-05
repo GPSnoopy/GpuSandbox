@@ -21,8 +21,8 @@ namespace AleaSandbox
                 Console.WriteLine();
 
                 using var context = new ILGPU.Context();
-                var aleaGpu = Alea.Gpu.Default;
-                var ilGpu = new CudaAccelerator(context);
+                using var aleaGpu = Alea.Gpu.Default;
+                using var ilGpu = new CudaAccelerator(context);
 
                 RunAddVector(aleaGpu, ilGpu);
                 RunIntraReturn(aleaGpu, ilGpu);
@@ -160,6 +160,6 @@ namespace AleaSandbox
             }
         }
 
-        private const int Loops = 5;
+        private const int Loops = 10;
     }
 }

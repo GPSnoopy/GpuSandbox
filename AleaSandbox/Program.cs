@@ -101,6 +101,7 @@ namespace AleaSandbox
                 () => SquaredDistance.Alea(aleaGpu, matrixC, coordinates, c, x),
                 () => SquaredDistance.IlGpu(ilGpu, matrixC, coordinates, c, x),
                 () => SquaredDistance.AleaSharedMemory(aleaGpu, matrixC, coordinates, c, x),
+                () => SquaredDistance.IlGpuSharedMemory(ilGpu, matrixC, coordinates, c, x),
                 () => SquaredDistance.AleaFloat2(aleaGpu, matrixC, coordinates, c, x),
                 () => SquaredDistance.AleaConstants(aleaGpu, matrixC, coordinates, c, x),
                 () => SquaredDistance.AleaLocalMemory(aleaGpu, matrixC, coordinates, c, x));

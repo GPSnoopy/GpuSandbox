@@ -127,6 +127,16 @@ namespace AleaSandbox.Benchmarks
             AleaOptimisedImpl(gpu, mSquaredDistances, mCoordinates, c, n, "SquaredDistance.AleaSharedMemory", AleaKernelSharedMemory, i => i);
         }
 
+        public static void IlGpuSharedMemory(
+            CudaAccelerator gpu,
+            Real[] mSquaredDistances,
+            Real[] mCoordinates,
+            int c,
+            int n)
+        {
+            IlGpuOptimisedImpl(gpu, mSquaredDistances, mCoordinates, c, n, "SquaredDistance.IlGpuSharedMemory", IlGpuKernelSharedMemory, i => i);
+        }
+
         public static void AleaFloat2(
             Gpu gpu,
             Real[] mSquaredDistances,
@@ -217,6 +227,40 @@ namespace AleaSandbox.Benchmarks
                 Util.PrintPerformance(timer, name, n, c, n);
 
                 Gpu.Copy2D(cudaSquaredDistance, mSquaredDistances, n, n);
+            }
+        }
+
+        private static void IlGpuOptimisedImpl<TInt>(
+            CudaAccelerator gpu,
+            Real[] mSquaredDistances,
+            Real[] mCoordinates,
+            int c,
+            int n,
+            string name,
+            Action<ArrayView2D<Real>, ArrayView<Real>, TInt, int> kernelFunc,
+            Func<int, TInt> numCoordGetter)
+        where TInt : struct
+        {
+            using (var cudaSquaredDistance = gpu.Allocate<Real>(n, n))
+            using (var cudaCoordinates = gpu.Allocate<Real>(mCoordinates.Length))
+            {
+                cudaSquaredDistance.CopyFrom(mSquaredDistances, 0, (0, 0), mSquaredDistances.Length);
+                cudaCoordinates.CopyFrom(mCoordinates, 0, 0, mCoordinates.Length);
+
+                var timer = Stopwatch.StartNew();
+
+                const int blockSize = 128;
+                var gridSize = Util.DivUp(n, blockSize);
+                var lp = ((gridSize, gridSize, 1), (blockSize, 1, 1), 2 * c * blockSize);
+                var pitch = cudaSquaredDistance.Extent.X;
+
+                var kernel = gpu.LoadStreamKernel(kernelFunc);
+                kernel(lp, cudaSquaredDistance.View, cudaCoordinates.View, numCoordGetter(c), n);
+
+                gpu.Synchronize();
+                Util.PrintPerformance(timer, name, n, c, n);
+
+                cudaSquaredDistance.CopyTo(mSquaredDistances, (0, 0), 0, (n, n));
             }
         }
 
@@ -336,6 +380,69 @@ namespace AleaSandbox.Benchmarks
                     }
 
                     mSquaredDistances[(bI + i) * pitch + (bJ + threadIdx.x)] = dist;
+                }
+            }
+        }
+
+        private static void IlGpuKernelSharedMemory(
+            ArrayView2D<Real> mSquaredDistances,
+            ArrayView<Real> mCoordinates,
+            int c,
+            int n)
+        {
+            // We've got shared memory of two vector of K dimensions for B points:
+            //
+            //      var coordI = __shared__ new Real[k*blockDim.x];
+            //      var coordJ = __shared__ new Real[k*blockDim.x];
+            //
+            // We fill in these two vectors with the coordinates of the I points and J points.
+            // Afterwards, the current block will compute the euclidean distances between all 
+            // the I points and J points, producing a square matrix [B, B].
+            //
+            // This optimisation means that when producing the square matrix, the I and J points
+            // coordinates are only read once.
+            //
+            // This optimisation works well if K is small enough. Otherwise the shared memory is
+            // too small and not enough blocks get schedule per SM.
+
+            var shared = SharedMemory.AllocateDynamic<Real>();
+            var coordinatesI = shared.GetSubView(0, c * Group.DimensionX);
+            var coordinatesJ = shared.GetSubView(c * Group.DimensionX);
+
+            var bI = Group.IndexY * Group.DimensionX;
+            var bJ = Group.IndexX * Group.DimensionX;
+
+            for (int k = 0; k != c; ++k)
+            {
+                if (bI + Group.IndexX < n)
+                {
+                    coordinatesI[k * Group.DimensionX + Group.IndexX] = mCoordinates[k * n + bI + Group.IndexX];
+                }
+
+                if (bJ + Group.IndexX < n)
+                {
+                    coordinatesJ[k * Group.DimensionX + Group.IndexX] = mCoordinates[k * n + bJ + Group.IndexX];
+                }
+            }
+            
+            Group.Barrier();
+
+            if (bJ + Group.IndexX < n)
+            {
+                for (int i = 0; i < Group.DimensionX && bI + i < n; ++i)
+                {
+                    Real dist = 0;
+
+                    for (int k = 0; k != c; ++k)
+                    {
+                        var coord1 = coordinatesI[k * Group.DimensionX + i]; //mCoordinates[k * x + i];
+                        var coord2 = coordinatesJ[k * Group.DimensionX + Group.IndexX]; //mCoordinates[k * x + j];
+                        var diff = coord1 - coord2;
+
+                        dist += diff * diff;
+                    }
+
+                    mSquaredDistances[bI + i, bJ + Group.IndexX] = dist;
                 }
             }
         }

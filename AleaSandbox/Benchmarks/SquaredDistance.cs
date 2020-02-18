@@ -105,9 +105,9 @@ namespace AleaSandbox.Benchmarks
                 const int blockSize = 128;
 
                 var gridSize = Util.DivUp(n * n, blockSize);
-                var lp = new GroupedIndex(gridSize, blockSize);
+                var lp = (gridSize, blockSize);
 
-                var kernel = gpu.LoadStreamKernel<GroupedIndex, ArrayView<Real>, ArrayView<Real>, int, int>(IlGpuKernel);
+                var kernel = gpu.LoadStreamKernel<ArrayView<Real>, ArrayView<Real>, int, int>(IlGpuKernel);
                 kernel(lp, cudaSquaredDistance.View, cudaCoordinates.View, c, n);
 
                 gpu.Synchronize();
@@ -249,7 +249,6 @@ namespace AleaSandbox.Benchmarks
         }
 
         private static void IlGpuKernel(
-            GroupedIndex index,
             ArrayView<Real> mSquaredDistances,
             ArrayView<Real> mCoordinates,
             int c,

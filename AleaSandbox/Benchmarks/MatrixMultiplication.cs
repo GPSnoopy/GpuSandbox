@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Diagnostics;
 using Alea;
-using ILGPU;
-using ILGPU.Algorithms;
 using ILGPU.Runtime.Cuda;
 
 #if DOUBLE_PRECISION

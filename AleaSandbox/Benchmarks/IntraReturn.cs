@@ -118,10 +118,9 @@ namespace AleaSandbox.Benchmarks
 
                 var gridSizeX = Util.DivUp(n, 32);
                 var gridSizeY = Util.DivUp(m, 8);
-                var lp = new GroupedIndex2(new Index2(gridSizeX, gridSizeY), new Index2(32, 8));
+                var lp = ((gridSizeX, gridSizeY, 1), (32, 8));
 
-                var kernel = gpu.LoadStreamKernel<
-                    GroupedIndex2, ArrayView<Real>, ArrayView<Real>, ArrayView<Real>, ArrayView<Real>, int, int>(IlGpuKernel);
+                var kernel = gpu.LoadStreamKernel<ArrayView<Real>, ArrayView<Real>, ArrayView<Real>, ArrayView<Real>, int, int>(IlGpuKernel);
                 kernel(lp, cudaIntraReturn.View, cudaClose.View, cudaIsAlive.View, cudaIsValidDay.View, m, n);
 
                 gpu.Synchronize();
@@ -154,7 +153,6 @@ namespace AleaSandbox.Benchmarks
         }
 
         private static void IlGpuKernel(
-            GroupedIndex2 index,
             ArrayView<Real> mIntraReturn,
             ArrayView<Real> vClose,
             ArrayView<Real> vIsAlive,

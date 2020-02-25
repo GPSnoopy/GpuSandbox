@@ -160,8 +160,8 @@ namespace AleaSandbox.Benchmarks
             int m,
             int n)
         {
-            var i = Grid.IndexY * Group.DimensionY + Group.IndexY;
-            var j = Grid.IndexX * Group.DimensionX + Group.IndexX;
+            var i = Grid.IdxY * Group.DimY + Group.IdxY;
+            var j = Grid.IdxX * Group.DimX + Group.IdxX;
 
             if (i < m && j < n)
             {

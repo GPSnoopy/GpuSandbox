@@ -103,7 +103,9 @@ namespace AleaSandbox
                 () => SquaredDistance.AleaSharedMemory(aleaGpu, matrixC, coordinates, c, x),
                 () => SquaredDistance.IlGpuSharedMemory(ilGpu, matrixC, coordinates, c, x),
                 () => SquaredDistance.AleaFloat2(aleaGpu, matrixC, coordinates, c, x),
+                () => SquaredDistance.IlGpuFloat2(ilGpu, matrixC, coordinates, c, x),
                 () => SquaredDistance.AleaConstants(aleaGpu, matrixC, coordinates, c, x),
+                () => SquaredDistance.IlGpuConstants(ilGpu, matrixC, coordinates, c, x),
                 () => SquaredDistance.AleaLocalMemory(aleaGpu, matrixC, coordinates, c, x));
         }
 
@@ -161,6 +163,6 @@ namespace AleaSandbox
             }
         }
 
-        private const int Loops = 10;
+        private const int Loops = 2;
     }
 }

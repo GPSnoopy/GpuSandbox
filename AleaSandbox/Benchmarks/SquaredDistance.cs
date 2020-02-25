@@ -9,9 +9,11 @@ using ILGPU.Runtime.Cuda;
 #if DOUBLE_PRECISION
     using Real = System.Double;
     using Real2 = Alea.double2;
+    using IlReal2 = ILGPU.Util.Double2;
 #else
-    using Real = System.Single;
+using Real = System.Single;
     using Real2 = Alea.float2;
+    using IlReal2 = ILGPU.Util.Float2;
 #endif
 
 namespace AleaSandbox.Benchmarks
@@ -149,6 +151,18 @@ namespace AleaSandbox.Benchmarks
             AleaOptimisedImpl(gpu, mSquaredDistances, mCoordinates, c, n, "SquaredDistance.AleaFloat2", AleaKernelFloat2, i => i);
         }
 
+        public static void IlGpuFloat2(
+            CudaAccelerator gpu,
+            Real[] mSquaredDistances,
+            Real[] mCoordinates,
+            int c,
+            int n)
+        {
+            if (n % 2 != 0) throw new ArgumentException("n must be a multiple of 2");
+
+            IlGpuOptimisedImpl(gpu, mSquaredDistances, mCoordinates, c, n, "SquaredDistance.IlGpuFloat2", IlGpuKernelFloat2, i => i);
+        }
+
         public static void AleaConstants(
             Gpu gpu, 
             Real[] mSquaredDistances,
@@ -159,6 +173,18 @@ namespace AleaSandbox.Benchmarks
             if (n % 2 != 0) throw new ArgumentException("n must be a multiple of 2");
 
             AleaOptimisedImpl(gpu, mSquaredDistances, mCoordinates, c, n, "SquaredDistance.AleaConstants", AleaKernelConstants, Gpu.Constant);
+        }
+
+        public static void IlGpuConstants(
+            CudaAccelerator gpu,
+            Real[] mSquaredDistances,
+            Real[] mCoordinates,
+            int c,
+            int n)
+        {
+            if (n % 2 != 0) throw new ArgumentException("n must be a multiple of 2");
+
+            IlGpuOptimisedImpl(gpu, mSquaredDistances, mCoordinates, c, n, "SquaredDistance.IlGpuConstants", IlGpuKernelConstants, i => new SpecializedValue<int>(i));
         }
 
         public static void AleaLocalMemory(
@@ -251,8 +277,7 @@ namespace AleaSandbox.Benchmarks
 
                 const int blockSize = 128;
                 var gridSize = Util.DivUp(n, blockSize);
-                var lp = ((gridSize, gridSize, 1), (blockSize, 1, 1), 2 * c * blockSize);
-                var pitch = cudaSquaredDistance.Extent.X;
+                var lp = ((gridSize, gridSize, 1), (blockSize, 1, 1), SharedMemoryConfig.RequestDynamic<Real>(2 * c * blockSize));
 
                 var kernel = gpu.LoadStreamKernel(kernelFunc);
                 kernel(lp, cudaSquaredDistance.View, cudaCoordinates.View, numCoordGetter(c), n);
@@ -298,7 +323,7 @@ namespace AleaSandbox.Benchmarks
             int c,
             int n)
         {
-            var j = Grid.IndexX * Group.DimensionX + Group.IndexX;
+            var j = Grid.IdxX * Group.DimX + Group.IdxX;
 
             if (j < n)
             {
@@ -405,44 +430,44 @@ namespace AleaSandbox.Benchmarks
             // This optimisation works well if K is small enough. Otherwise the shared memory is
             // too small and not enough blocks get schedule per SM.
 
-            var shared = SharedMemory.AllocateDynamic<Real>();
-            var coordinatesI = shared.GetSubView(0, c * Group.DimensionX);
-            var coordinatesJ = shared.GetSubView(c * Group.DimensionX);
+            var shared = SharedMemory.GetDynamic<Real>();
+            var coordinatesI = shared.GetSubView(0, c * Group.DimX);
+            var coordinatesJ = shared.GetSubView(c * Group.DimX);
 
-            var bI = Group.IndexY * Group.DimensionX;
-            var bJ = Group.IndexX * Group.DimensionX;
+            var bI = Group.IdxY * Group.DimX;
+            var bJ = Group.IdxX * Group.DimX;
 
             for (int k = 0; k != c; ++k)
             {
-                if (bI + Group.IndexX < n)
+                if (bI + Group.IdxX < n)
                 {
-                    coordinatesI[k * Group.DimensionX + Group.IndexX] = mCoordinates[k * n + bI + Group.IndexX];
+                    coordinatesI[k * Group.DimX + Group.IdxX] = mCoordinates[k * n + bI + Group.IdxX];
                 }
 
-                if (bJ + Group.IndexX < n)
+                if (bJ + Group.IdxX < n)
                 {
-                    coordinatesJ[k * Group.DimensionX + Group.IndexX] = mCoordinates[k * n + bJ + Group.IndexX];
+                    coordinatesJ[k * Group.DimX + Group.IdxX] = mCoordinates[k * n + bJ + Group.IdxX];
                 }
             }
             
             Group.Barrier();
 
-            if (bJ + Group.IndexX < n)
+            if (bJ + Group.IdxX < n)
             {
-                for (int i = 0; i < Group.DimensionX && bI + i < n; ++i)
+                for (int i = 0; i < Group.DimX && bI + i < n; ++i)
                 {
                     Real dist = 0;
 
                     for (int k = 0; k != c; ++k)
                     {
-                        var coord1 = coordinatesI[k * Group.DimensionX + i]; //mCoordinates[k * x + i];
-                        var coord2 = coordinatesJ[k * Group.DimensionX + Group.IndexX]; //mCoordinates[k * x + j];
+                        var coord1 = coordinatesI[k * Group.DimX + i]; //mCoordinates[k * x + i];
+                        var coord2 = coordinatesJ[k * Group.DimX + Group.IdxX]; //mCoordinates[k * x + j];
                         var diff = coord1 - coord2;
 
                         dist += diff * diff;
                     }
 
-                    mSquaredDistances[bI + i, bJ + Group.IndexX] = dist;
+                    mSquaredDistances[bI + i, bJ + Group.IdxX] = dist;
                 }
             }
         }
@@ -506,6 +531,62 @@ namespace AleaSandbox.Benchmarks
             }
         }
 
+        private static void IlGpuKernelFloat2(
+            ArrayView2D<Real> mSquaredDistances,
+            ArrayView<Real> mCoordinates,
+            int c,
+            int n)
+        {
+            // Same as KernelSharedMemory, but one thread does two element in one by using float2 reads.
+
+            var shared = SharedMemory.GetDynamic<Real>();
+            var coordinatesI = shared.GetSubView(0, c * Group.DimX);
+            var coordinatesJ = shared.GetSubView(c * Group.DimX);
+
+            var bI = Grid.IdxY * Group.DimX;
+            var bJ = Grid.IdxX * Group.DimX;
+
+            for (int k = 0; k != c; ++k)
+            {
+                if (bI + Group.IdxX < n)
+                {
+                    coordinatesI[k * Group.DimX + Group.IdxX] = mCoordinates[k * n + bI + Group.IdxX];
+                }
+
+                if (bJ + Group.IdxX < n)
+                {
+                    coordinatesJ[k * Group.DimX + Group.IdxX] = mCoordinates[k * n + bJ + Group.IdxX];
+                }
+            }
+
+            Group.Barrier();
+
+            var line = Group.IdxX / (Group.DimX / 2);
+            var tid = Group.IdxX % (Group.DimX / 2);
+
+            if (bJ + tid * 2 < n)
+            {
+                var coordinatesJ2 = coordinatesJ.Cast<IlReal2>();
+
+                for (int i = line; i < Group.DimX && bI + i < n; i += 2)
+                {
+                    var dist = default(IlReal2);
+
+                    for (int k = 0; k != c; ++k)
+                    {
+                        var coord1 = coordinatesI[k * Group.DimX + i];
+                        var coord2 = coordinatesJ2[(k * Group.DimX / 2) + tid];
+                        var diff = new IlReal2(coord1 - coord2.X, coord1 - coord2.Y);
+
+                        dist += diff * diff;
+                    }
+
+                    mSquaredDistances[bI + i, bJ + 2 * tid + 0] = dist.X;
+                    mSquaredDistances[bI + i, bJ + 2 * tid + 1] = dist.Y;
+                }
+            }
+        }
+
         private static void AleaKernelConstants(
             deviceptr<Real> mSquaredDistances,
             deviceptr<Real> mCoordinates,
@@ -561,6 +642,63 @@ namespace AleaSandbox.Benchmarks
 
                     var dst = mSquaredDistances.Ptr((bI + i) * pitch + bJ).Reinterpret<Real2>();
                     dst[tid] = dist;
+                }
+            }
+        }
+
+        private static void IlGpuKernelConstants(
+            ArrayView2D<Real> mSquaredDistances,
+            ArrayView<Real> mCoordinates,
+            SpecializedValue<int> c,
+            int n)
+        {
+            // Same as CudaKernelOptimised2, but the number of coordinates is given as a meta-constant.
+            // Also, we write the results as float2.
+
+            var shared = SharedMemory.GetDynamic<Real>();
+            var coordinatesI = shared.GetSubView(0, c * Group.DimX);
+            var coordinatesJ = shared.GetSubView(c * Group.DimX);
+
+            var bI = Grid.IdxY * Group.DimX;
+            var bJ = Grid.IdxX * Group.DimX;
+
+            for (int k = 0; k != c; ++k)
+            {
+                if (bI + Group.IdxX < n)
+                {
+                    coordinatesI[k * Group.DimX + Group.IdxX] = mCoordinates[k * n + bI + Group.IdxX];
+                }
+
+                if (bJ + Group.IdxX < n)
+                {
+                    coordinatesJ[k * Group.DimX + Group.IdxX] = mCoordinates[k * n + bJ + Group.IdxX];
+                }
+            }
+
+            Group.Barrier();
+
+            var line = Group.IdxX / (Group.DimX / 2);
+            var tid = Group.IdxX % (Group.DimX / 2);
+
+            if (bJ + tid * 2 < n)
+            {
+                var coordinatesJ2 = coordinatesJ.Cast<IlReal2>();
+
+                for (int i = line; i < Group.DimX && bI + i < n; i += 2)
+                {
+                    var dist = default(IlReal2);
+
+                    for (int k = 0; k != c; ++k)
+                    {
+                        var coord1 = coordinatesI[k * Group.DimX + i];
+                        var coord2 = coordinatesJ2[(k * Group.DimX / 2) + tid];
+                        var diff = new IlReal2(coord1 - coord2.X, coord1 - coord2.Y);
+
+                        dist += diff * diff;
+                    }
+
+                    var dst = mSquaredDistances.Cast<IlReal2>();
+                    dst[bI + i, bJ / 2] = dist;
                 }
             }
         }

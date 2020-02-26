@@ -697,8 +697,12 @@ namespace AleaSandbox.Benchmarks
                         dist += diff * diff;
                     }
 
-                    var dst = mSquaredDistances.Cast<IlReal2>();
-                    dst[bI + i, bJ / 2] = dist;
+                    // TODO get this version working
+                    //var dst = mSquaredDistances.Cast<IlReal2>();
+                    //dst[bI + i, bJ / 2 + tid] = dist;
+
+                    mSquaredDistances[bI + i, bJ + 2 * tid + 0] = dist.X;
+                    mSquaredDistances[bI + i, bJ + 2 * tid + 1] = dist.Y;
                 }
             }
         }

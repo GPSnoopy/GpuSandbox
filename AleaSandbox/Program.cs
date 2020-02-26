@@ -163,6 +163,6 @@ namespace AleaSandbox
             }
         }
 
-        private const int Loops = 2;
+        private const int Loops = 10;
     }
 }

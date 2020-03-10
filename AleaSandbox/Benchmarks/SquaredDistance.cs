@@ -21,11 +21,20 @@ namespace AleaSandbox.Benchmarks
     internal static class SquaredDistance
     {
         public static void Initialise(
+            Real[] mSquaredDistances,
             Real[] mCoordinates,
             int c,
             int n)
         {
             var rand = new Random(1);
+
+            for (int i = 0; i != n; ++i)
+            {
+                for (int j = 0; j != n; ++j)
+                {
+                    mSquaredDistances[i * n + j] = 0;
+                }
+            }
 
             for (int i = 0; i != c * n; ++i)
             {
@@ -434,8 +443,8 @@ namespace AleaSandbox.Benchmarks
             var coordinatesI = shared.GetSubView(0, c * Group.DimX);
             var coordinatesJ = shared.GetSubView(c * Group.DimX);
 
-            var bI = Group.IdxY * Group.DimX;
-            var bJ = Group.IdxX * Group.DimX;
+            var bI = Grid.IdxY * Group.DimX;
+            var bJ = Grid.IdxX * Group.DimX;
 
             for (int k = 0; k != c; ++k)
             {
@@ -467,7 +476,7 @@ namespace AleaSandbox.Benchmarks
                         dist += diff * diff;
                     }
 
-                    mSquaredDistances[bI + i, bJ + Group.IdxX] = dist;
+                    mSquaredDistances[bJ + Group.IdxX, bI + i] = dist;
                 }
             }
         }
@@ -581,8 +590,8 @@ namespace AleaSandbox.Benchmarks
                         dist += diff * diff;
                     }
 
-                    mSquaredDistances[bI + i, bJ + 2 * tid + 0] = dist.X;
-                    mSquaredDistances[bI + i, bJ + 2 * tid + 1] = dist.Y;
+                    mSquaredDistances[bJ + 2 * tid + 0, bI + i] = dist.X;
+                    mSquaredDistances[bJ + 2 * tid + 1, bI + i] = dist.Y;
                 }
             }
         }
@@ -699,10 +708,10 @@ namespace AleaSandbox.Benchmarks
 
                     // TODO get this version working
                     //var dst = mSquaredDistances.Cast<IlReal2>();
-                    //dst[bI + i, bJ / 2 + tid] = dist;
+                    //dst[bJ / 2 + tid, bI + i] = dist;
 
-                    mSquaredDistances[bI + i, bJ + 2 * tid + 0] = dist.X;
-                    mSquaredDistances[bI + i, bJ + 2 * tid + 1] = dist.Y;
+                    mSquaredDistances[bJ + 2 * tid + 0, bI + i] = dist.X;
+                    mSquaredDistances[bJ + 2 * tid + 1, bI + i] = dist.Y;
                 }
             }
         }

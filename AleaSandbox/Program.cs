@@ -94,8 +94,8 @@ namespace AleaSandbox
             var coordinates = new Real[c * x];
 
             Benchmark.Run(Loops,
-                () => SquaredDistance.Initialise(coordinates, c, x),
-                () => SquaredDistance.Initialise(coordinates, c, x),
+                () => SquaredDistance.Initialise(matrixM, coordinates, c, x),
+                () => SquaredDistance.Initialise(matrixC, coordinates, c, x),
                 () => AssertAreEqual(matrixM, matrixC, x, x),
                 () => SquaredDistance.Managed(matrixM, coordinates, c, x),
                 () => SquaredDistance.Alea(aleaGpu, matrixC, coordinates, c, x),

@@ -17,11 +17,11 @@ namespace AleaSandbox
         {
             try
             {
-                Alea.Device.Default.Print();
+                Device.Default.Print();
                 Console.WriteLine();
 
                 using var context = new ILGPU.Context();
-                using var aleaGpu = Alea.Gpu.Default;
+                using var aleaGpu = Gpu.Default;
                 using var ilGpu = new CudaAccelerator(context);
 
                 RunAddVector(aleaGpu, ilGpu);
@@ -106,7 +106,8 @@ namespace AleaSandbox
                 () => SquaredDistance.IlGpuFloat2(ilGpu, matrixC, coordinates, c, x),
                 () => SquaredDistance.AleaConstants(aleaGpu, matrixC, coordinates, c, x),
                 () => SquaredDistance.IlGpuConstants(ilGpu, matrixC, coordinates, c, x),
-                () => SquaredDistance.AleaLocalMemory(aleaGpu, matrixC, coordinates, c, x));
+                () => SquaredDistance.AleaLocalMemory(aleaGpu, matrixC, coordinates, c, x)/*,
+                () => SquaredDistance.IlGpuLocalMemory(ilGpu, matrixC, coordinates, c, x)*/);
         }
 
         private static void RunMatrixMultiplication(Gpu aleaGpu, CudaAccelerator ilGpu)

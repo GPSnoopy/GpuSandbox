@@ -79,23 +79,21 @@ namespace AleaSandbox.Benchmarks
             int c,
             int n)
         {
-            using (var cudaSquaredDistance = gpu.AllocateDevice(mSquaredDistances))
-            using (var cudaCoordinates = gpu.AllocateDevice(mCoordinates))
-            {
-                var timer = Stopwatch.StartNew();
+            using var cudaSquaredDistance = gpu.AllocateDevice(mSquaredDistances);
+            using var cudaCoordinates = gpu.AllocateDevice(mCoordinates);
+            var timer = Stopwatch.StartNew();
 
-                const int blockSize = 128;
+            const int blockSize = 128;
 
-                var gridSize = Util.DivUp(n * n, blockSize);
-                var lp = new LaunchParam(gridSize, blockSize);
+            var gridSize = Util.DivUp(n * n, blockSize);
+            var lp = new LaunchParam(gridSize, blockSize);
 
-                gpu.Launch(AleaKernel, lp, cudaSquaredDistance.Ptr, cudaCoordinates.Ptr, c, n);
+            gpu.Launch(AleaKernel, lp, cudaSquaredDistance.Ptr, cudaCoordinates.Ptr, c, n);
+            gpu.Synchronize();
 
-                gpu.Synchronize();
-                Util.PrintPerformance(timer, "SquaredDistance.Alea", n, c, n);
+            Util.PrintPerformance(timer, "SquaredDistance.Alea", n, c, n);
 
-                Gpu.Copy(cudaSquaredDistance, mSquaredDistances);
-            }
+            Gpu.Copy(cudaSquaredDistance, mSquaredDistances);
         }
 
         public static void IlGpu(
@@ -105,27 +103,26 @@ namespace AleaSandbox.Benchmarks
             int c,
             int n)
         {
-            using (var cudaSquaredDistance = gpu.Allocate<Real>(mSquaredDistances.Length))
-            using (var cudaCoordinates = gpu.Allocate<Real>(mCoordinates.Length))
-            {
-                cudaSquaredDistance.CopyFrom(mSquaredDistances, 0, 0, mSquaredDistances.Length);
-                cudaCoordinates.CopyFrom(mCoordinates, 0, 0, mCoordinates.Length);
+            using var cudaSquaredDistance = gpu.Allocate<Real>(mSquaredDistances.Length);
+            using var cudaCoordinates = gpu.Allocate<Real>(mCoordinates.Length);
 
-                var timer = Stopwatch.StartNew();
+            cudaSquaredDistance.CopyFrom(mSquaredDistances, 0, 0, mSquaredDistances.Length);
+            cudaCoordinates.CopyFrom(mCoordinates, 0, 0, mCoordinates.Length);
 
-                const int blockSize = 128;
+            var timer = Stopwatch.StartNew();
 
-                var gridSize = Util.DivUp(n * n, blockSize);
-                var lp = (gridSize, blockSize);
+            const int blockSize = 128;
 
-                var kernel = gpu.LoadStreamKernel<ArrayView<Real>, ArrayView<Real>, int, int>(IlGpuKernel);
-                kernel(lp, cudaSquaredDistance.View, cudaCoordinates.View, c, n);
+            var gridSize = Util.DivUp(n * n, blockSize);
+            var lp = (gridSize, blockSize);
 
-                gpu.Synchronize();
-                Util.PrintPerformance(timer, "SquaredDistance.IlGpu", n, c, n);
+            var kernel = gpu.LoadStreamKernel<ArrayView<Real>, ArrayView<Real>, int, int>(IlGpuKernel);
+            kernel(lp, cudaSquaredDistance.View, cudaCoordinates.View, c, n);
+            gpu.Synchronize();
 
-                cudaSquaredDistance.CopyTo(mSquaredDistances, 0, 0, mSquaredDistances.Length);
-            }
+            Util.PrintPerformance(timer, "SquaredDistance.IlGpu", n, c, n);
+
+            cudaSquaredDistance.CopyTo(mSquaredDistances, 0, 0, mSquaredDistances.Length);
         }
 
         public static void AleaSharedMemory(
@@ -208,6 +205,18 @@ namespace AleaSandbox.Benchmarks
             AleaOptimisedImpl(gpu, mSquaredDistances, mCoordinates, c, n, "SquaredDistance.AleaLocalMemory", AleaKernelLocalMemory);
         }
 
+        public static void IlGpuLocalMemory(
+            CudaAccelerator gpu,
+            Real[] mSquaredDistances,
+            Real[] mCoordinates,
+            int c,
+            int n)
+        {
+            if (n % 2 != 0) throw new ArgumentException("n must be a multiple of 2");
+
+            IlGpuOptimisedImpl(gpu, mSquaredDistances, mCoordinates, c, n, "SquaredDistance.IlGpuLocalMemory", IlGpuKernelLocalMemory);
+        }
+
         private static void AleaOptimisedImpl<TInt>(
             Gpu gpu,
             Real[] mSquaredDistances,
@@ -218,23 +227,21 @@ namespace AleaSandbox.Benchmarks
             Action<deviceptr<Real>, deviceptr<Real>, TInt, int, int> kernel,
             Func<int, TInt> numCoordGetter)
         {
-            using (var cudaSquaredDistance = gpu.AllocateDevice<Real>(n, n))
-            using (var cudaCoordinates = gpu.AllocateDevice(mCoordinates))
-            {
-                var timer = Stopwatch.StartNew();
+            using var cudaSquaredDistance = gpu.AllocateDevice<Real>(n, n);
+            using var cudaCoordinates = gpu.AllocateDevice(mCoordinates);
+            var timer = Stopwatch.StartNew();
 
-                const int blockSize = 128;
-                var gridSize = Util.DivUp(n, blockSize);
-                var lp = new LaunchParam(new dim3(gridSize, gridSize, 1), new dim3(blockSize, 1, 1), 2 * c * blockSize * sizeof(Real));
-                var pitch = cudaSquaredDistance.PitchInElements.ToInt32();
+            const int blockSize = 128;
+            var gridSize = Util.DivUp(n, blockSize);
+            var lp = new LaunchParam(new dim3(gridSize, gridSize, 1), new dim3(blockSize, 1, 1), 2 * c * blockSize * sizeof(Real));
+            var pitch = cudaSquaredDistance.PitchInElements.ToInt32();
 
-                gpu.Launch(kernel, lp, cudaSquaredDistance.Ptr, cudaCoordinates.Ptr, numCoordGetter(c), n, pitch);
+            gpu.Launch(kernel, lp, cudaSquaredDistance.Ptr, cudaCoordinates.Ptr, numCoordGetter(c), n, pitch);
+            gpu.Synchronize();
 
-                gpu.Synchronize();
-                Util.PrintPerformance(timer, name, n, c, n);
+            Util.PrintPerformance(timer, name, n, c, n);
 
-                Gpu.Copy2D(cudaSquaredDistance, mSquaredDistances, n, n);
-            }
+            Gpu.Copy2D(cudaSquaredDistance, mSquaredDistances, n, n);
         }
 
         private static void AleaOptimisedImpl(
@@ -246,23 +253,21 @@ namespace AleaSandbox.Benchmarks
             string name,
             Action<deviceptr<Real>, deviceptr<Real>, Constant<int>, Constant<int>, int, int> kernel)
         {
-            using (var cudaSquaredDistance = gpu.AllocateDevice<Real>(n, n))
-            using (var cudaCoordinates = gpu.AllocateDevice(mCoordinates))
-            {
-                var timer = Stopwatch.StartNew();
+            using var cudaSquaredDistance = gpu.AllocateDevice<Real>(n, n);
+            using var cudaCoordinates = gpu.AllocateDevice(mCoordinates);
+            var timer = Stopwatch.StartNew();
 
-                const int blockSize = 256;
-                var gridSize = Util.DivUp(n, blockSize);
-                var lp = new LaunchParam(new dim3(gridSize, gridSize, 1), new dim3(blockSize, 1, 1));
-                var pitch = cudaSquaredDistance.PitchInElements.ToInt32();
+            const int blockSize = 256;
+            var gridSize = Util.DivUp(n, blockSize);
+            var lp = new LaunchParam(new dim3(gridSize, gridSize, 1), new dim3(blockSize, 1, 1));
+            var pitch = cudaSquaredDistance.PitchInElements.ToInt32();
 
-                gpu.Launch(kernel, lp, cudaSquaredDistance.Ptr, cudaCoordinates.Ptr, Gpu.Constant(blockSize), Gpu.Constant(c), n, pitch);
+            gpu.Launch(kernel, lp, cudaSquaredDistance.Ptr, cudaCoordinates.Ptr, Gpu.Constant(blockSize), Gpu.Constant(c), n, pitch);
+            gpu.Synchronize();
 
-                gpu.Synchronize();
-                Util.PrintPerformance(timer, name, n, c, n);
+            Util.PrintPerformance(timer, name, n, c, n);
 
-                Gpu.Copy2D(cudaSquaredDistance, mSquaredDistances, n, n);
-            }
+            Gpu.Copy2D(cudaSquaredDistance, mSquaredDistances, n, n);
         }
 
         private static void IlGpuOptimisedImpl<TInt>(
@@ -276,26 +281,55 @@ namespace AleaSandbox.Benchmarks
             Func<int, TInt> numCoordGetter)
         where TInt : struct
         {
-            using (var cudaSquaredDistance = gpu.Allocate<Real>(n, n))
-            using (var cudaCoordinates = gpu.Allocate<Real>(mCoordinates.Length))
-            {
-                cudaSquaredDistance.CopyFrom(mSquaredDistances, 0, (0, 0), mSquaredDistances.Length);
-                cudaCoordinates.CopyFrom(mCoordinates, 0, 0, mCoordinates.Length);
+            using var cudaSquaredDistance = gpu.Allocate<Real>(n, n);
+            using var cudaCoordinates = gpu.Allocate<Real>(mCoordinates.Length);
 
-                var timer = Stopwatch.StartNew();
+            cudaSquaredDistance.CopyFrom(mSquaredDistances, 0, (0, 0), mSquaredDistances.Length);
+            cudaCoordinates.CopyFrom(mCoordinates, 0, 0, mCoordinates.Length);
 
-                const int blockSize = 128;
-                var gridSize = Util.DivUp(n, blockSize);
-                var lp = ((gridSize, gridSize, 1), (blockSize, 1, 1), SharedMemoryConfig.RequestDynamic<Real>(2 * c * blockSize));
+            var timer = Stopwatch.StartNew();
 
-                var kernel = gpu.LoadStreamKernel(kernelFunc);
-                kernel(lp, cudaSquaredDistance.View, cudaCoordinates.View, numCoordGetter(c), n);
+            const int blockSize = 128;
+            var gridSize = Util.DivUp(n, blockSize);
+            var lp = ((gridSize, gridSize, 1), (blockSize, 1, 1), SharedMemoryConfig.RequestDynamic<Real>(2 * c * blockSize));
 
-                gpu.Synchronize();
-                Util.PrintPerformance(timer, name, n, c, n);
+            var kernel = gpu.LoadStreamKernel(kernelFunc);
+            kernel(lp, cudaSquaredDistance.View, cudaCoordinates.View, numCoordGetter(c), n);
+            gpu.Synchronize();
 
-                cudaSquaredDistance.CopyTo(mSquaredDistances, (0, 0), 0, (n, n));
-            }
+            Util.PrintPerformance(timer, name, n, c, n);
+
+            cudaSquaredDistance.CopyTo(mSquaredDistances, (0, 0), 0, (n, n));
+        }
+
+        private static void IlGpuOptimisedImpl(
+            CudaAccelerator gpu,
+            Real[] mSquaredDistances,
+            Real[] mCoordinates,
+            int c,
+            int n,
+            string name,
+            Action<ArrayView2D<Real>, ArrayView<Real>, SpecializedValue<int>, SpecializedValue<int>, int> kernelFunc)
+        {
+            using var cudaSquaredDistance = gpu.Allocate<Real>(n, n);
+            using var cudaCoordinates = gpu.Allocate<Real>(mCoordinates.Length);
+
+            cudaSquaredDistance.CopyFrom(mSquaredDistances, 0, (0, 0), mSquaredDistances.Length);
+            cudaCoordinates.CopyFrom(mCoordinates, 0, 0, mCoordinates.Length);
+
+            var timer = Stopwatch.StartNew();
+
+            const int blockSize = 128;
+            var gridSize = Util.DivUp(n, blockSize);
+            var lp = ((gridSize, gridSize, 1), (blockSize, 1, 1));
+
+            var kernel = gpu.LoadStreamKernel(kernelFunc);
+            kernel(lp, cudaSquaredDistance.View, cudaCoordinates.View, SpecializedValue.New(blockSize), SpecializedValue.New(c), n);
+            gpu.Synchronize();
+
+            Util.PrintPerformance(timer, name, n, c, n);
+
+            cudaSquaredDistance.CopyTo(mSquaredDistances, (0, 0), 0, (n, n));
         }
 
         private static void AleaKernel(
@@ -706,12 +740,8 @@ namespace AleaSandbox.Benchmarks
                         dist += diff * diff;
                     }
 
-                    // TODO get this version working
-                    //var dst = mSquaredDistances.Cast<IlReal2>();
-                    //dst[bJ / 2 + tid, bI + i] = dist;
-
-                    mSquaredDistances[bJ + 2 * tid + 0, bI + i] = dist.X;
-                    mSquaredDistances[bJ + 2 * tid + 1, bI + i] = dist.Y;
+                    var dst = mSquaredDistances.Cast<IlReal2>();
+                    dst[bJ / 2 + tid, bI + i] = dist;
                 }
             }
         }
@@ -769,6 +799,61 @@ namespace AleaSandbox.Benchmarks
 
                     var dst = mSquaredDistances.Reinterpret<Real2>();
                     dst[((bI + i) * pitch + bJ) / 2 + tid] = dist;
+                }
+            }
+        }
+
+        private static void IlGpuKernelLocalMemory(
+            ArrayView2D<Real> mSquaredDistances,
+            ArrayView<Real> mCoordinates,
+            SpecializedValue<int> dimX,
+            SpecializedValue<int> c,
+            int n)
+        {
+            // Same as KernelConstants, but use both local and shared memory to increase the effective shared memory.
+
+            var coordinatesI = SharedMemory.Allocate<Real>(c * dimX);
+            var coordinatesJ = new IlReal2[c.Value];
+
+            var bI = Grid.IdxY * dimX;
+            var bJ = Grid.IdxX * dimX;
+            var line = Group.IdxX / (dimX / 2);
+            var tid = Group.IdxX % (dimX / 2);
+            var isActive = bJ + tid * 2 < n;
+
+            for (int k = 0; k != c.Value; ++k)
+            {
+                if (bI + Group.IdxX < n)
+                {
+                    coordinatesI[k * dimX + Group.IdxX] = mCoordinates[k * n + bI + Group.IdxX];
+                }
+
+                if (isActive)
+                {
+                    var mCoordinates2 = mCoordinates.Cast<IlReal2>();
+                    coordinatesJ[k] = mCoordinates2[(k * n + bJ) / 2 + tid];
+                }
+            }
+
+            Group.Barrier();
+
+            if (isActive)
+            {
+                for (int i = line; i < dimX && bI + i < n; i += 2)
+                {
+                    var dist = default(IlReal2);
+
+                    for (int k = 0; k != c.Value; ++k)
+                    {
+                        var coord1 = coordinatesI[k * dimX + i];
+                        var coord2 = coordinatesJ[k];
+                        var diff = new IlReal2(coord1 - coord2.X, coord1 - coord2.Y);
+
+                        dist += diff * diff;
+                    }
+
+                    var dst = mSquaredDistances.Cast<IlReal2>();
+                    dst[bJ / 2 + tid, bI + i] = dist;
                 }
             }
         }

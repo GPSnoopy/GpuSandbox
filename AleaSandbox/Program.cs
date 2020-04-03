@@ -106,8 +106,8 @@ namespace AleaSandbox
                 () => SquaredDistance.IlGpuFloat2(ilGpu, matrixC, coordinates, c, x),
                 () => SquaredDistance.AleaConstants(aleaGpu, matrixC, coordinates, c, x),
                 () => SquaredDistance.IlGpuConstants(ilGpu, matrixC, coordinates, c, x),
-                () => SquaredDistance.AleaLocalMemory(aleaGpu, matrixC, coordinates, c, x)/*,
-                () => SquaredDistance.IlGpuLocalMemory(ilGpu, matrixC, coordinates, c, x)*/);
+                () => SquaredDistance.AleaLocalMemory(aleaGpu, matrixC, coordinates, c, x),
+                () => SquaredDistance.IlGpuLocalMemory(ilGpu, matrixC, coordinates, c, x));
         }
 
         private static void RunMatrixMultiplication(Gpu aleaGpu, CudaAccelerator ilGpu)

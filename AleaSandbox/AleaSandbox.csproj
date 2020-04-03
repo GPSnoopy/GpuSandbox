@@ -16,7 +16,7 @@
   <ItemGroup>
     <PackageReference Include="Alea" Version="3.0.4" />
     <PackageReference Include="FSharp.Core" Version="4.7.0" />
-    <PackageReference Include="ILGPU" Version="0.8.0-beta05" />
+    <PackageReference Include="ILGPU" Version="0.8.0-beta06" />
     <PackageReference Include="ILGPU.Algorithms" Version="0.7.1" />
   </ItemGroup>
 </Project>

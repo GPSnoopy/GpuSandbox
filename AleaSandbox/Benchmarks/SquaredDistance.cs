@@ -103,12 +103,8 @@ namespace AleaSandbox.Benchmarks
             int c,
             int n)
         {
-            using var cudaSquaredDistance = gpu.Allocate<Real>(mSquaredDistances.Length);
-            using var cudaCoordinates = gpu.Allocate<Real>(mCoordinates.Length);
-
-            cudaSquaredDistance.CopyFrom(mSquaredDistances, 0, 0, mSquaredDistances.Length);
-            cudaCoordinates.CopyFrom(mCoordinates, 0, 0, mCoordinates.Length);
-
+            using var cudaSquaredDistance = gpu.Allocate(mSquaredDistances);
+            using var cudaCoordinates = gpu.Allocate(mCoordinates);
             var timer = Stopwatch.StartNew();
 
             const int blockSize = 128;
@@ -282,11 +278,7 @@ namespace AleaSandbox.Benchmarks
         where TInt : struct
         {
             using var cudaSquaredDistance = gpu.Allocate<Real>(n, n);
-            using var cudaCoordinates = gpu.Allocate<Real>(mCoordinates.Length);
-
-            cudaSquaredDistance.CopyFrom(mSquaredDistances, 0, (0, 0), mSquaredDistances.Length);
-            cudaCoordinates.CopyFrom(mCoordinates, 0, 0, mCoordinates.Length);
-
+            using var cudaCoordinates = gpu.Allocate(mCoordinates);
             var timer = Stopwatch.StartNew();
 
             const int blockSize = 128;
@@ -312,11 +304,7 @@ namespace AleaSandbox.Benchmarks
             Action<ArrayView2D<Real>, ArrayView<Real>, SpecializedValue<int>, SpecializedValue<int>, int> kernelFunc)
         {
             using var cudaSquaredDistance = gpu.Allocate<Real>(n, n);
-            using var cudaCoordinates = gpu.Allocate<Real>(mCoordinates.Length);
-
-            cudaSquaredDistance.CopyFrom(mSquaredDistances, 0, (0, 0), mSquaredDistances.Length);
-            cudaCoordinates.CopyFrom(mCoordinates, 0, 0, mCoordinates.Length);
-
+            using var cudaCoordinates = gpu.Allocate(mCoordinates);
             var timer = Stopwatch.StartNew();
 
             const int blockSize = 128;

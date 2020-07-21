@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Diagnostics;
 using Alea;
+using ILGPU.Runtime;
 using ILGPU.Runtime.Cuda;
 
 #if DOUBLE_PRECISION
@@ -72,14 +73,10 @@ namespace AleaSandbox.Benchmarks
 
         public static void IlGpu(CudaAccelerator gpu, Real[] result, Real[] left, Real[] right, int n)
         {
-            using (var cudaResult = gpu.Allocate<Real>(result.Length))
-            using (var cudaLeft = gpu.Allocate<Real>(left.Length))
-            using (var cudaRight = gpu.Allocate<Real>(right.Length))
+            using (var cudaResult = gpu.Allocate(result))
+            using (var cudaLeft = gpu.Allocate(left))
+            using (var cudaRight = gpu.Allocate(right))
             {
-                cudaResult.CopyFrom(result, 0, 0, result.Length);
-                cudaLeft.CopyFrom(left, 0, 0, left.Length);
-                cudaRight.CopyFrom(right, 0, 0, right.Length);
-
                 using var blas = new CuBlas(gpu);
 
                 var timer = Stopwatch.StartNew();

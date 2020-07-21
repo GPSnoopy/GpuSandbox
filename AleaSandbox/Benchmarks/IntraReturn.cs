@@ -104,16 +104,11 @@ namespace AleaSandbox.Benchmarks
             int m,
             int n)
         {
-            using (var cudaIntraReturn = gpu.Allocate<Real>(mIntraReturn.Length))
-            using (var cudaClose = gpu.Allocate<Real>(vClose.Length))
-            using (var cudaIsAlive = gpu.Allocate<Real>(vIsAlive.Length))
-            using (var cudaIsValidDay = gpu.Allocate<Real>(vIsValidDay.Length))
+            using (var cudaIntraReturn = gpu.Allocate(mIntraReturn))
+            using (var cudaClose = gpu.Allocate(vClose))
+            using (var cudaIsAlive = gpu.Allocate(vIsAlive))
+            using (var cudaIsValidDay = gpu.Allocate(vIsValidDay))
             {
-                cudaIntraReturn.CopyFrom(mIntraReturn, 0, 0, mIntraReturn.Length);
-                cudaClose.CopyFrom(vClose, 0, 0, vClose.Length);
-                cudaIsAlive.CopyFrom(vIsAlive, 0, 0, vIsAlive.Length);
-                cudaIsValidDay.CopyFrom(vIsValidDay, 0, 0, vIsValidDay.Length);
-
                 var timer = Stopwatch.StartNew();
 
                 var gridSizeX = Util.DivUp(n, 32);

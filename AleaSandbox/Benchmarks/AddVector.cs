@@ -60,12 +60,9 @@ namespace AleaSandbox.Benchmarks
 
         public static void IlGpu(CudaAccelerator gpu, Real[] matrix, Real[] vector, int m, int n)
         {
-            using (var cudaMatrix = gpu.Allocate<Real>(matrix.Length))
-            using (var cudaVector = gpu.Allocate<Real>(vector.Length))
+            using (var cudaMatrix = gpu.Allocate(matrix))
+            using (var cudaVector = gpu.Allocate(vector))
             {
-                cudaMatrix.CopyFrom(matrix, 0, 0, matrix.Length);
-                cudaVector.CopyFrom(vector, 0, 0, vector.Length);
-
                 var timer = Stopwatch.StartNew();
 
                 var gridSizeX = Util.DivUp(n, 32);

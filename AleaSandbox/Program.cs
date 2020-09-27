@@ -1,6 +1,8 @@
 ﻿using System;
 using Alea;
 using AleaSandbox.Benchmarks;
+using ILGPU;
+using ILGPU.IR.Transformations;
 using ILGPU.Runtime.Cuda;
 
 #if DOUBLE_PRECISION
@@ -20,7 +22,9 @@ namespace AleaSandbox
                 Device.Default.Print();
                 Console.WriteLine();
 
-                using var context = new ILGPU.Context();
+                using var context = new ILGPU.Context(
+                    ContextFlags.AggressiveInlining,
+                    OptimizationLevel.O2);
                 using var aleaGpu = Gpu.Default;
                 using var ilGpu = new CudaAccelerator(context);
 

@@ -468,17 +468,16 @@ namespace AleaSandbox.Benchmarks
             var bI = Grid.IdxY * Group.DimX;
             var bJ = Grid.IdxX * Group.DimX;
 
-            for (int k = 0; k != c; ++k)
+            if (bI + Group.IdxX < n)
             {
-                if (bI + Group.IdxX < n)
-                {
+                for (int k = 0; k < c; ++k)
                     coordinatesI[k * Group.DimX + Group.IdxX] = mCoordinates[k * n + bI + Group.IdxX];
-                }
+            }
 
-                if (bJ + Group.IdxX < n)
-                {
+            if (bJ + Group.IdxX < n)
+            {
+                for (int k = 0; k < c; ++k)
                     coordinatesJ[k * Group.DimX + Group.IdxX] = mCoordinates[k * n + bJ + Group.IdxX];
-                }
             }
             
             Group.Barrier();
@@ -489,7 +488,7 @@ namespace AleaSandbox.Benchmarks
                 {
                     Real dist = 0;
 
-                    for (int k = 0; k != c; ++k)
+                    for (int k = 0; k < c; ++k)
                     {
                         var coord1 = coordinatesI[k * Group.DimX + i]; //mCoordinates[k * x + i];
                         var coord2 = coordinatesJ[k * Group.DimX + Group.IdxX]; //mCoordinates[k * x + j];
@@ -570,24 +569,24 @@ namespace AleaSandbox.Benchmarks
         {
             // Same as KernelSharedMemory, but one thread does two element in one by using float2 reads.
 
-            var shared = SharedMemory.GetDynamic<Real>();
+            var sharedMemory = SharedMemory.GetDynamic<Real2>();
+            var shared = sharedMemory.Cast<Real>();
             var coordinatesI = shared.GetSubView(0, c * Group.DimX);
             var coordinatesJ = shared.GetSubView(c * Group.DimX);
 
             var bI = Grid.IdxY * Group.DimX;
             var bJ = Grid.IdxX * Group.DimX;
 
-            for (int k = 0; k != c; ++k)
+            if (bI + Group.IdxX < n)
             {
-                if (bI + Group.IdxX < n)
-                {
+                for (int k = 0; k < c; ++k)
                     coordinatesI[k * Group.DimX + Group.IdxX] = mCoordinates[k * n + bI + Group.IdxX];
-                }
+            }
 
-                if (bJ + Group.IdxX < n)
-                {
+            if (bJ + Group.IdxX < n)
+            {
+                for (int k = 0; k < c; ++k)
                     coordinatesJ[k * Group.DimX + Group.IdxX] = mCoordinates[k * n + bJ + Group.IdxX];
-                }
             }
 
             Group.Barrier();
@@ -603,7 +602,7 @@ namespace AleaSandbox.Benchmarks
                 {
                     var dist = default(IlReal2);
 
-                    for (int k = 0; k != c; ++k)
+                    for (int k = 0; k < c; ++k)
                     {
                         var coord1 = coordinatesI[k * Group.DimX + i];
                         var coord2 = coordinatesJ2[(k * Group.DimX / 2) + tid];
@@ -686,24 +685,24 @@ namespace AleaSandbox.Benchmarks
             // Same as CudaKernelOptimised2, but the number of coordinates is given as a meta-constant.
             // Also, we write the results as float2.
 
-            var shared = SharedMemory.GetDynamic<Real>();
+            var sharedMemory = SharedMemory.GetDynamic<Real2>();
+            var shared = sharedMemory.Cast<Real>();
             var coordinatesI = shared.GetSubView(0, c * Group.DimX);
             var coordinatesJ = shared.GetSubView(c * Group.DimX);
 
             var bI = Grid.IdxY * Group.DimX;
             var bJ = Grid.IdxX * Group.DimX;
 
-            for (int k = 0; k != c; ++k)
+            if (bI + Group.IdxX < n)
             {
-                if (bI + Group.IdxX < n)
-                {
+                for (int k = 0; k < c; ++k)
                     coordinatesI[k * Group.DimX + Group.IdxX] = mCoordinates[k * n + bI + Group.IdxX];
-                }
+            }
 
-                if (bJ + Group.IdxX < n)
-                {
+            if (bJ + Group.IdxX < n)
+            {
+                for (int k = 0; k < c; ++k)
                     coordinatesJ[k * Group.DimX + Group.IdxX] = mCoordinates[k * n + bJ + Group.IdxX];
-                }
             }
 
             Group.Barrier();
@@ -715,11 +714,11 @@ namespace AleaSandbox.Benchmarks
             {
                 var coordinatesJ2 = coordinatesJ.Cast<IlReal2>();
 
-                for (int i = line; i < Group.DimX && bI + i < n; i += 2)
+                for (int i = line; i < Group.DimX & bI + i < n; i += 2)
                 {
                     var dist = default(IlReal2);
 
-                    for (int k = 0; k != c; ++k)
+                    for (int k = 0; k < c; ++k)
                     {
                         var coord1 = coordinatesI[k * Group.DimX + i];
                         var coord2 = coordinatesJ2[(k * Group.DimX / 2) + tid];

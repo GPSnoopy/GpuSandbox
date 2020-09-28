@@ -1,6 +1,8 @@
 ﻿using System;
 using Alea;
 using AleaSandbox.Benchmarks;
+using ILGPU;
+using ILGPU.IR.Transformations;
 using ILGPU.Runtime.Cuda;
 
 #if DOUBLE_PRECISION
@@ -20,7 +22,7 @@ namespace AleaSandbox
                 Device.Default.Print();
                 Console.WriteLine();
 
-                using var context = new ILGPU.Context();
+                using var context = new ILGPU.Context(ContextFlags.AggressiveInlining, OptimizationLevel.O2);
                 using var aleaGpu = Gpu.Default;
                 using var ilGpu = new CudaAccelerator(context);
 
@@ -48,8 +50,8 @@ namespace AleaSandbox
 
         private static void RunAddVector(Gpu aleaGpu, CudaAccelerator ilGpu)
         {
-            const int m = 24 * 12;
-            const int n = 25600 - 1;
+            const int m = 2 * 24 * 12;
+            const int n = 2 * 25600 - 1;
 
             var matrixM = new Real[m * n];
             var matrixC = new Real[m * n];
@@ -66,8 +68,8 @@ namespace AleaSandbox
 
         private static void RunIntraReturn(Gpu aleaGpu, CudaAccelerator ilGpu)
         {
-            const int m = 24 * 12;
-            const int n = 25600 - 1;
+            const int m = 2 * 24 * 12;
+            const int n = 2 * 25600 - 1;
 
             var matrixM = new Real[m * n];
             var matrixC = new Real[m * n];
@@ -87,7 +89,7 @@ namespace AleaSandbox
         private static void RunSquaredDistance(Gpu aleaGpu, CudaAccelerator ilGpu)
         {
             const int c = 20;
-            const int x = 10000;
+            const int x = 2 * 10000;
 
             var matrixM = new Real[x * x];
             var matrixC = new Real[x * x];

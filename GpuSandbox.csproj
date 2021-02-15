@@ -14,6 +14,9 @@
     <DebugType>full</DebugType>
   </PropertyGroup>
   <ItemGroup>
+    <None Remove=".gitignore" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="Alea" Version="3.0.4" />
     <PackageReference Include="FSharp.Core" Version="5.0.1" />
     <PackageReference Include="ILGPU" Version="0.10.0" />

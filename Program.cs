@@ -2,7 +2,7 @@
 
 using System;
 using Alea;
-using AleaSandbox.Benchmarks;
+using GpuSandbox.Benchmarks;
 using ILGPU.IR.Transformations;
 using ILGPU.Runtime.Cuda;
 
@@ -12,7 +12,7 @@ using ILGPU.Runtime.Cuda;
     using Real = System.Single;
 #endif
 
-namespace AleaSandbox
+namespace GpuSandbox
 {
     internal sealed class Program
     {

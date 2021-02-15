@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace AleaSandbox
+namespace GpuSandbox
 {
     internal static class Benchmark
     {

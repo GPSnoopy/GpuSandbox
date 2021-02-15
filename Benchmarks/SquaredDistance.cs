@@ -16,7 +16,7 @@ using Real = System.Single;
     using IlReal2 = ILGPU.Util.Float2;
 #endif
 
-namespace AleaSandbox.Benchmarks
+namespace GpuSandbox.Benchmarks
 {
     internal static class SquaredDistance
     {

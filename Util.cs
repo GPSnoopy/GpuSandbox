@@ -7,7 +7,7 @@ using System.Diagnostics;
     using Real = System.Single;
 #endif
 
-namespace AleaSandbox
+namespace GpuSandbox
 {
     internal static class Util
     {

@@ -9,7 +9,7 @@ using Alea;
     using Real = System.Single;
 #endif
 
-namespace AleaSandbox.Benchmarks
+namespace GpuSandbox.Benchmarks
 {
     internal static class ManyMatrixMultiplication
     {

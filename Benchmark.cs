@@ -6,7 +6,7 @@ namespace AleaSandbox
     {
         public static void Run(int loops, Action baseInitialise, Action testInitialise, Action compare, Action baseRun, params Action[] testRuns)
         {
-            for (int i = 0; i != loops; ++i)
+            //for (int i = 0; i != loops; ++i)
             {
                 baseInitialise();
                 baseRun();

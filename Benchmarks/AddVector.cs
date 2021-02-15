@@ -1,6 +1,9 @@
 ﻿using System.Diagnostics;
 using Alea;
 using Alea.CSharp;
+using ILGPU;
+using ILGPU.Runtime;
+using ILGPU.Runtime.Cuda;
 
 #if DOUBLE_PRECISION
     using Real = System.Double;
@@ -35,10 +38,8 @@ namespace AleaSandbox.Benchmarks
             Util.PrintPerformance(timer, "AddVector.Managed", 3, m, n);
         }
 
-        public static void Cuda(Real[] matrix, Real[] vector, int m, int n)
+        public static void Alea(Gpu gpu, Real[] matrix, Real[] vector, int m, int n)
         {
-            var gpu = Gpu.Default;
-
             using (var cudaMatrix = gpu.AllocateDevice(matrix))
             using (var cudaVector = gpu.AllocateDevice(vector))
             {
@@ -48,19 +49,50 @@ namespace AleaSandbox.Benchmarks
                 var gridSizeY = Util.DivUp(m, 8);
                 var lp = new LaunchParam(new dim3(gridSizeX, gridSizeY), new dim3(32, 8));
 
-                gpu.Launch(CudaKernel, lp, cudaMatrix.Ptr, cudaVector.Ptr, m, n);
+                gpu.Launch(AleaKernel, lp, cudaMatrix.Ptr, cudaVector.Ptr, m, n);
 
                 gpu.Synchronize();
-                Util.PrintPerformance(timer, "AddVector.Cuda", 3, m, n);
+                Util.PrintPerformance(timer, "AddVector.Alea", 3, m, n);
 
                 Gpu.Copy(cudaMatrix, matrix);
             }
         }
 
-        private static void CudaKernel(deviceptr<Real> matrix, deviceptr<Real> vector, int m, int n)
+        public static void IlGpu(CudaAccelerator gpu, Real[] matrix, Real[] vector, int m, int n)
+        {
+            using (var cudaMatrix = gpu.Allocate(matrix))
+            using (var cudaVector = gpu.Allocate(vector))
+            {
+                var timer = Stopwatch.StartNew();
+
+                var gridSizeX = Util.DivUp(n, 32);
+                var gridSizeY = Util.DivUp(m, 8);
+                var lp = ((gridSizeX, gridSizeY, 1), (32, 8));
+
+                gpu.Launch(IlGpuKernel, gpu.DefaultStream, lp, cudaMatrix.View, cudaVector.View, m, n);
+
+                gpu.Synchronize();
+                Util.PrintPerformance(timer, "AddVector.IlGpu", 3, m, n);
+
+                cudaMatrix.CopyTo(matrix, 0, 0, matrix.Length);
+            }
+        }
+
+        private static void AleaKernel(deviceptr<Real> matrix, deviceptr<Real> vector, int m, int n)
         {
             var i = blockIdx.y * blockDim.y + threadIdx.y;
             var j = blockIdx.x * blockDim.x + threadIdx.x;
+
+            if (i < m && j < n)
+            {
+                matrix[i * n + j] += vector[j];
+            }
+        }
+        
+        private static void IlGpuKernel(ArrayView<Real> matrix, ArrayView<Real> vector, int m, int n)
+        {
+            var i = Grid.IdxY * Group.DimY + Group.IdxY;
+            var j = Grid.IdxX * Group.DimX + Group.IdxX;
 
             if (i < m && j < n)
             {

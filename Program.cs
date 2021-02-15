@@ -1,5 +1,10 @@
-﻿using System;
+﻿//#define USE_ALEA
+
+using System;
+using Alea;
 using AleaSandbox.Benchmarks;
+using ILGPU.IR.Transformations;
+using ILGPU.Runtime.Cuda;
 
 #if DOUBLE_PRECISION
     using Real = System.Double;
@@ -15,14 +20,26 @@ namespace AleaSandbox
         {
             try
             {
-                Alea.Device.Default.Print();
+#if USE_ALEA
+                Device.Default.Print();
+#endif
                 Console.WriteLine();
 
-                RunAddVector();
-                RunIntraReturn();
-                RunSquaredDistance();
-                RunMatrixMultiplication();
-                RunManyMatrixMultiplication();
+                using var context = new ILGPU.Context(OptimizationLevel.O2);
+                using var aleaGpu = Gpu.Default;
+
+                using var ilGpu = new CudaAccelerator(context);
+
+                RunAddVector(aleaGpu, ilGpu);
+                RunIntraReturn(aleaGpu, ilGpu);
+                RunSquaredDistance(aleaGpu, ilGpu);
+                RunMatrixMultiplication(aleaGpu, ilGpu);
+                RunManyMatrixMultiplication(aleaGpu, ilGpu);
+
+                // ILGPU remarks:
+                // - Allocate and copy extension methods?
+                // - Allocate 64-bits / long size?
+                // - Access to additional CUDA intrinsics.
             }
 
             catch (Exception exception)
@@ -35,10 +52,10 @@ namespace AleaSandbox
             }
         }
 
-        private static void RunAddVector()
+        private static void RunAddVector(Gpu aleaGpu, CudaAccelerator ilGpu)
         {
-            const int m = 24 * 12;
-            const int n = 25600 - 1;
+            const int m = 2 * 24 * 12;
+            const int n = 2 * 25600 - 1;
 
             var matrixM = new Real[m * n];
             var matrixC = new Real[m * n];
@@ -49,13 +66,16 @@ namespace AleaSandbox
                 () => AddVector.Initialise(matrixC, vector, m, n),
                 () => AssertAreEqual(matrixM, matrixC, m, n),
                 () => AddVector.Managed(matrixM, vector, m, n),
-                () => AddVector.Cuda(matrixC, vector, m, n));
+#if USE_ALEA
+                () => AddVector.Alea(aleaGpu, matrixC, vector, m, n),
+#endif
+                () => AddVector.IlGpu(ilGpu, matrixC, vector, m, n));
         }
 
-        private static void RunIntraReturn()
+        private static void RunIntraReturn(Gpu aleaGpu, CudaAccelerator ilGpu)
         {
-            const int m = 24 * 12;
-            const int n = 25600 - 1;
+            const int m = 2 * 24 * 12;
+            const int n = 2 * 25600 - 1;
 
             var matrixM = new Real[m * n];
             var matrixC = new Real[m * n];
@@ -68,31 +88,49 @@ namespace AleaSandbox
                 () => IntraReturn.Initialise(matrixC, vector1, vector2, vector3, m, n),
                 () => AssertAreEqual(matrixM, matrixC, m, n),
                 () => IntraReturn.Managed(matrixM, vector1, vector2, vector3, m, n),
-                () => IntraReturn.Cuda(matrixC, vector1, vector2, vector3, m, n));
+#if USE_ALEA
+                () => IntraReturn.Alea(aleaGpu, matrixC, vector1, vector2, vector3, m, n),
+#endif
+                () => IntraReturn.IlGpu(ilGpu, matrixC, vector1, vector2, vector3, m, n));
         }
 
-        private static void RunSquaredDistance()
+        private static void RunSquaredDistance(Gpu aleaGpu, CudaAccelerator ilGpu)
         {
             const int c = 20;
-            const int x = 10000;
+            const int x = 2 * 10000;
 
             var matrixM = new Real[x * x];
             var matrixC = new Real[x * x];
             var coordinates = new Real[c * x];
 
             Benchmark.Run(Loops,
-                () => SquaredDistance.Initialise(coordinates, c, x),
-                () => SquaredDistance.Initialise(coordinates, c, x),
+                () => SquaredDistance.Initialise(matrixM, coordinates, c, x),
+                () => SquaredDistance.Initialise(matrixC, coordinates, c, x),
                 () => AssertAreEqual(matrixM, matrixC, x, x),
                 () => SquaredDistance.Managed(matrixM, coordinates, c, x),
-                () => SquaredDistance.Cuda(matrixC, coordinates, c, x),
-                () => SquaredDistance.CudaSharedMemory(matrixC, coordinates, c, x),
-                () => SquaredDistance.CudaFloat2(matrixC, coordinates, c, x),
-                () => SquaredDistance.CudaConstants(matrixC, coordinates, c, x),
-                () => SquaredDistance.CudaLocalMemory(matrixC, coordinates, c, x));
+#if USE_ALEA              
+                () => SquaredDistance.Alea(aleaGpu, matrixC, coordinates, c, x),
+#endif
+                () => SquaredDistance.IlGpu(ilGpu, matrixC, coordinates, c, x),
+#if USE_ALEA               
+                () => SquaredDistance.AleaSharedMemory(aleaGpu, matrixC, coordinates, c, x),
+#endif
+                () => SquaredDistance.IlGpuSharedMemory(ilGpu, matrixC, coordinates, c, x),
+#if USE_ALEA              
+                () => SquaredDistance.AleaFloat2(aleaGpu, matrixC, coordinates, c, x),
+#endif
+                () => SquaredDistance.IlGpuFloat2(ilGpu, matrixC, coordinates, c, x),
+#if USE_ALEA             
+                () => SquaredDistance.AleaConstants(aleaGpu, matrixC, coordinates, c, x),
+#endif
+                () => SquaredDistance.IlGpuConstants(ilGpu, matrixC, coordinates, c, x),
+#if USE_ALEA            
+                () => SquaredDistance.AleaLocalMemory(aleaGpu, matrixC, coordinates, c, x),
+#endif
+                () => SquaredDistance.IlGpuLocalMemory(ilGpu, matrixC, coordinates, c, x));
         }
 
-        private static void RunMatrixMultiplication()
+        private static void RunMatrixMultiplication(Gpu aleaGpu, CudaAccelerator ilGpu)
         {
             const int n = 1500 - 1;
 
@@ -106,10 +144,11 @@ namespace AleaSandbox
                 () => MatrixMultiplication.Initialise(left, right, n),
                 () => AssertAreEqual(resultM, resultC, n, n),
                 () => MatrixMultiplication.Managed(resultM, left, right, n),
-                () => MatrixMultiplication.Cuda(resultC, left, right, n));
+                () => MatrixMultiplication.Alea(aleaGpu, resultC, left, right, n),
+                () => MatrixMultiplication.IlGpu(ilGpu, resultC, left, right, n));
         }
 
-        private static void RunManyMatrixMultiplication()
+        private static void RunManyMatrixMultiplication(Gpu aleaGpu, CudaAccelerator ilGpu)
         {
             const int m = 100;
             const int n = 250 - 1;
@@ -124,7 +163,7 @@ namespace AleaSandbox
                 () => ManyMatrixMultiplication.Initialise(left, right, m, n),
                 () => AssertAreEqual(resultM, resultC, m * n, n),
                 () => ManyMatrixMultiplication.Managed(resultM, left, right, m, n),
-                () => ManyMatrixMultiplication.Cuda(resultC, left, right, m, n));
+                () => ManyMatrixMultiplication.Alea(aleaGpu, resultC, left, right, m, n));
         }
 
         private static void AssertAreEqual(Real[] left, Real[] right, int m, int n)
@@ -145,6 +184,6 @@ namespace AleaSandbox
             }
         }
 
-        private const int Loops = 5;
+        private const int Loops = 10;
     }
 }

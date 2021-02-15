@@ -66,10 +66,8 @@ namespace AleaSandbox.Benchmarks
             }
         }
 
-        public static unsafe void Cuda(Real[] result, Real[] left, Real[] right, int m, int n)
+        public static unsafe void Alea(Gpu gpu, Real[] result, Real[] left, Real[] right, int m, int n)
         {
-            var gpu = Gpu.Default;
-
             using (var cudaResult = gpu.AllocateDevice(result))
             using (var cudaLeft = gpu.AllocateDevice(left))
             using (var cudaRight = gpu.AllocateDevice(right))
@@ -89,20 +87,20 @@ namespace AleaSandbox.Benchmarks
                     {
                         var timer = Stopwatch.StartNew();
 
-                        var blas = Alea.cuBLAS.Blas.Get(gpu);
+                        var blas = global::Alea.cuBLAS.Blas.Get(gpu);
                         var lAlphas = pAlphas;
                         var lBetas = pBetas;
 
                         gpu.EvalAction(() =>
-                            Alea.cuBLAS.Interop.cublasSafeCall(
+                            global::Alea.cuBLAS.Interop.cublasSafeCall(
 #if DOUBLE_PRECISION
-                            Alea.cuBLAS.Interop.cublasDgemmBatched(
+                            global::Alea.cuBLAS.Interop.cublasDgemmBatched(
 #else
-                                Alea.cuBLAS.Interop.cublasSgemmBatched(
+                                global::Alea.cuBLAS.Interop.cublasSgemmBatched(
 #endif
                                     blas.Handle,
-                                    Alea.cuBLAS.Operation.N,
-                                    Alea.cuBLAS.Operation.N,
+                                    global::Alea.cuBLAS.Operation.N,
+                                    global::Alea.cuBLAS.Operation.N,
                                     n,
                                     n,
                                     n,

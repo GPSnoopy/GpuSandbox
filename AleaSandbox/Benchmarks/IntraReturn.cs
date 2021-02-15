@@ -115,8 +115,7 @@ namespace AleaSandbox.Benchmarks
                 var gridSizeY = Util.DivUp(m, 8);
                 var lp = ((gridSizeX, gridSizeY, 1), (32, 8));
 
-                var kernel = gpu.LoadStreamKernel<ArrayView<Real>, ArrayView<Real>, ArrayView<Real>, ArrayView<Real>, int, int>(IlGpuKernel);
-                kernel(lp, cudaIntraReturn.View, cudaClose.View, cudaIsAlive.View, cudaIsValidDay.View, m, n);
+                gpu.Launch(IlGpuKernel, gpu.DefaultStream, lp, cudaIntraReturn.View, cudaClose.View, cudaIsAlive.View, cudaIsValidDay.View, m, n);
 
                 gpu.Synchronize();
                 Util.PrintPerformance(timer, "IntraReturn.IlGpu", 5, m, n);

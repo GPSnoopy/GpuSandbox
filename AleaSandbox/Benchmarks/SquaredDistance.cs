@@ -112,8 +112,7 @@ namespace AleaSandbox.Benchmarks
             var gridSize = Util.DivUp(n * n, blockSize);
             var lp = (gridSize, blockSize);
 
-            var kernel = gpu.LoadStreamKernel<ArrayView<Real>, ArrayView<Real>, int, int>(IlGpuKernel);
-            kernel(lp, cudaSquaredDistance.View, cudaCoordinates.View, c, n);
+            gpu.Launch(IlGpuKernel, gpu.DefaultStream, lp, cudaSquaredDistance.View, cudaCoordinates.View, c, n);
             gpu.Synchronize();
 
             Util.PrintPerformance(timer, "SquaredDistance.IlGpu", n, c, n);
@@ -285,8 +284,7 @@ namespace AleaSandbox.Benchmarks
             var gridSize = Util.DivUp(n, blockSize);
             var lp = ((gridSize, gridSize, 1), (blockSize, 1, 1), SharedMemoryConfig.RequestDynamic<Real>(2 * c * blockSize));
 
-            var kernel = gpu.LoadStreamKernel(kernelFunc);
-            kernel(lp, cudaSquaredDistance.View, cudaCoordinates.View, numCoordGetter(c), n);
+            gpu.Launch(kernelFunc, gpu.DefaultStream, lp, cudaSquaredDistance.View, cudaCoordinates.View, numCoordGetter(c), n);
             gpu.Synchronize();
 
             Util.PrintPerformance(timer, name, n, c, n);
@@ -311,8 +309,7 @@ namespace AleaSandbox.Benchmarks
             var gridSize = Util.DivUp(n, blockSize);
             var lp = ((gridSize, gridSize, 1), (blockSize, 1, 1));
 
-            var kernel = gpu.LoadStreamKernel(kernelFunc);
-            kernel(lp, cudaSquaredDistance.View, cudaCoordinates.View, SpecializedValue.New(blockSize), SpecializedValue.New(c), n);
+            gpu.Launch(kernelFunc, gpu.DefaultStream, lp, cudaSquaredDistance.View, cudaCoordinates.View, SpecializedValue.New(blockSize), SpecializedValue.New(c), n);
             gpu.Synchronize();
 
             Util.PrintPerformance(timer, name, n, c, n);
@@ -715,7 +712,7 @@ namespace AleaSandbox.Benchmarks
             {
                 var coordinatesJ2 = coordinatesJ.Cast<IlReal2>();
 
-                for (int i = line; i < Group.DimX && bI + i < n; i += 2)
+                for (int i = line; i < Group.DimX & bI + i < n; i += 2)
                 {
                     var dist = default(IlReal2);
 

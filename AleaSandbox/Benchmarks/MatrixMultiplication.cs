@@ -77,7 +77,7 @@ namespace AleaSandbox.Benchmarks
             using (var cudaLeft = gpu.Allocate(left))
             using (var cudaRight = gpu.Allocate(right))
             {
-                using var blas = new CuBlas(gpu, CuBlasAPIVersion.V10);
+                using var blas = new CuBlas(gpu, CuBlasAPIVersion.V11);
 
                 var timer = Stopwatch.StartNew();
                 

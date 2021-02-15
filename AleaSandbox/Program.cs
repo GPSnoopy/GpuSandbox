@@ -1,7 +1,8 @@
-﻿using System;
+﻿//#define USE_ALEA
+
+using System;
 using Alea;
 using AleaSandbox.Benchmarks;
-using ILGPU;
 using ILGPU.IR.Transformations;
 using ILGPU.Runtime.Cuda;
 
@@ -19,11 +20,18 @@ namespace AleaSandbox
         {
             try
             {
+#if USE_ALEA
                 Device.Default.Print();
+#endif
                 Console.WriteLine();
 
-                using var context = new ILGPU.Context(ContextFlags.AggressiveInlining, OptimizationLevel.O2);
-                using var aleaGpu = Gpu.Default;
+                using var context = new ILGPU.Context(OptimizationLevel.O2);
+                using var aleaGpu =
+#if USE_ALEA
+                        Gpu.Default;
+#else
+                        (Gpu) null;
+#endif
                 using var ilGpu = new CudaAccelerator(context);
 
                 RunAddVector(aleaGpu, ilGpu);
@@ -62,7 +70,9 @@ namespace AleaSandbox
                 () => AddVector.Initialise(matrixC, vector, m, n),
                 () => AssertAreEqual(matrixM, matrixC, m, n),
                 () => AddVector.Managed(matrixM, vector, m, n),
+#if USE_ALEA
                 () => AddVector.Alea(aleaGpu, matrixC, vector, m, n),
+#endif
                 () => AddVector.IlGpu(ilGpu, matrixC, vector, m, n));
         }
 
@@ -82,7 +92,9 @@ namespace AleaSandbox
                 () => IntraReturn.Initialise(matrixC, vector1, vector2, vector3, m, n),
                 () => AssertAreEqual(matrixM, matrixC, m, n),
                 () => IntraReturn.Managed(matrixM, vector1, vector2, vector3, m, n),
+#if USE_ALEA
                 () => IntraReturn.Alea(aleaGpu, matrixC, vector1, vector2, vector3, m, n),
+#endif
                 () => IntraReturn.IlGpu(ilGpu, matrixC, vector1, vector2, vector3, m, n));
         }
 
@@ -100,15 +112,25 @@ namespace AleaSandbox
                 () => SquaredDistance.Initialise(matrixC, coordinates, c, x),
                 () => AssertAreEqual(matrixM, matrixC, x, x),
                 () => SquaredDistance.Managed(matrixM, coordinates, c, x),
+#if USE_ALEA              
                 () => SquaredDistance.Alea(aleaGpu, matrixC, coordinates, c, x),
+#endif
                 () => SquaredDistance.IlGpu(ilGpu, matrixC, coordinates, c, x),
+#if USE_ALEA               
                 () => SquaredDistance.AleaSharedMemory(aleaGpu, matrixC, coordinates, c, x),
+#endif
                 () => SquaredDistance.IlGpuSharedMemory(ilGpu, matrixC, coordinates, c, x),
+#if USE_ALEA              
                 () => SquaredDistance.AleaFloat2(aleaGpu, matrixC, coordinates, c, x),
+#endif
                 () => SquaredDistance.IlGpuFloat2(ilGpu, matrixC, coordinates, c, x),
+#if USE_ALEA             
                 () => SquaredDistance.AleaConstants(aleaGpu, matrixC, coordinates, c, x),
+#endif
                 () => SquaredDistance.IlGpuConstants(ilGpu, matrixC, coordinates, c, x),
+#if USE_ALEA            
                 () => SquaredDistance.AleaLocalMemory(aleaGpu, matrixC, coordinates, c, x),
+#endif
                 () => SquaredDistance.IlGpuLocalMemory(ilGpu, matrixC, coordinates, c, x));
         }
 
@@ -126,7 +148,9 @@ namespace AleaSandbox
                 () => MatrixMultiplication.Initialise(left, right, n),
                 () => AssertAreEqual(resultM, resultC, n, n),
                 () => MatrixMultiplication.Managed(resultM, left, right, n),
+#if USE_ALEA
                 () => MatrixMultiplication.Alea(aleaGpu, resultC, left, right, n),
+#endif
                 () => MatrixMultiplication.IlGpu(ilGpu, resultC, left, right, n));
         }
 

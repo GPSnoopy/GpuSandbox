@@ -26,19 +26,15 @@ namespace AleaSandbox
                 Console.WriteLine();
 
                 using var context = new ILGPU.Context(OptimizationLevel.O2);
-                using var aleaGpu =
-#if USE_ALEA
-                        Gpu.Default;
-#else
-                        (Gpu) null;
-#endif
+                using var aleaGpu = Gpu.Default;
+
                 using var ilGpu = new CudaAccelerator(context);
 
                 RunAddVector(aleaGpu, ilGpu);
                 RunIntraReturn(aleaGpu, ilGpu);
                 RunSquaredDistance(aleaGpu, ilGpu);
                 RunMatrixMultiplication(aleaGpu, ilGpu);
-                RunManyMatrixMultiplication();
+                RunManyMatrixMultiplication(aleaGpu, ilGpu);
 
                 // ILGPU remarks:
                 // - Allocate and copy extension methods?
@@ -148,13 +144,11 @@ namespace AleaSandbox
                 () => MatrixMultiplication.Initialise(left, right, n),
                 () => AssertAreEqual(resultM, resultC, n, n),
                 () => MatrixMultiplication.Managed(resultM, left, right, n),
-#if USE_ALEA
                 () => MatrixMultiplication.Alea(aleaGpu, resultC, left, right, n),
-#endif
                 () => MatrixMultiplication.IlGpu(ilGpu, resultC, left, right, n));
         }
 
-        private static void RunManyMatrixMultiplication()
+        private static void RunManyMatrixMultiplication(Gpu aleaGpu, CudaAccelerator ilGpu)
         {
             const int m = 100;
             const int n = 250 - 1;
@@ -169,7 +163,7 @@ namespace AleaSandbox
                 () => ManyMatrixMultiplication.Initialise(left, right, m, n),
                 () => AssertAreEqual(resultM, resultC, m * n, n),
                 () => ManyMatrixMultiplication.Managed(resultM, left, right, m, n),
-                () => ManyMatrixMultiplication.Cuda(resultC, left, right, m, n));
+                () => ManyMatrixMultiplication.Alea(aleaGpu, resultC, left, right, m, n));
         }
 
         private static void AssertAreEqual(Real[] left, Real[] right, int m, int n)

@@ -5,7 +5,6 @@ using Alea;
 using Alea.CSharp;
 using ILGPU;
 using ILGPU.Runtime;
-using ILGPU.Runtime.Cuda;
 
 #if DOUBLE_PRECISION
     using Real = System.Double;
@@ -96,7 +95,7 @@ namespace GpuSandbox.Benchmarks
         }
 
         public static void IlGpu(
-            CudaAccelerator gpu,
+            Accelerator gpu,
             Real[] mIntraReturn,
             Real[] vClose,
             Real[] vIsAlive,
@@ -104,10 +103,10 @@ namespace GpuSandbox.Benchmarks
             int m,
             int n)
         {
-            using (var cudaIntraReturn = gpu.Allocate(mIntraReturn))
-            using (var cudaClose = gpu.Allocate(vClose))
-            using (var cudaIsAlive = gpu.Allocate(vIsAlive))
-            using (var cudaIsValidDay = gpu.Allocate(vIsValidDay))
+            using (var cudaIntraReturn = gpu.Allocate1D(mIntraReturn))
+            using (var cudaClose = gpu.Allocate1D(vClose))
+            using (var cudaIsAlive = gpu.Allocate1D(vIsAlive))
+            using (var cudaIsValidDay = gpu.Allocate1D(vIsValidDay))
             {
                 var timer = Stopwatch.StartNew();
 
@@ -120,7 +119,7 @@ namespace GpuSandbox.Benchmarks
                 gpu.Synchronize();
                 Util.PrintPerformance(timer, "IntraReturn.IlGpu", 5, m, n);
 
-                cudaIntraReturn.CopyTo(mIntraReturn, 0, 0, mIntraReturn.Length);
+                cudaIntraReturn.CopyToCPU(mIntraReturn);
             }
         }
 
@@ -147,10 +146,10 @@ namespace GpuSandbox.Benchmarks
         }
 
         private static void IlGpuKernel(
-            ArrayView<Real> mIntraReturn,
-            ArrayView<Real> vClose,
-            ArrayView<Real> vIsAlive,
-            ArrayView<Real> vIsValidDay,
+            ArrayView1D<Real, Stride1D.Dense> mIntraReturn,
+            ArrayView1D<Real, Stride1D.Dense> vClose,
+            ArrayView1D<Real, Stride1D.Dense> vIsAlive,
+            ArrayView1D<Real, Stride1D.Dense> vIsValidDay,
             int m,
             int n)
         {

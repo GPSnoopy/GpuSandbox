@@ -3,7 +3,6 @@ using Alea;
 using Alea.CSharp;
 using ILGPU;
 using ILGPU.Runtime;
-using ILGPU.Runtime.Cuda;
 
 #if DOUBLE_PRECISION
     using Real = System.Double;
@@ -58,10 +57,10 @@ namespace GpuSandbox.Benchmarks
             }
         }
 
-        public static void IlGpu(CudaAccelerator gpu, Real[] matrix, Real[] vector, int m, int n)
+        public static void IlGpu(Accelerator gpu, Real[] matrix, Real[] vector, int m, int n)
         {
-            using (var cudaMatrix = gpu.Allocate(matrix))
-            using (var cudaVector = gpu.Allocate(vector))
+            using (var cudaMatrix = gpu.Allocate1D(matrix))
+            using (var cudaVector = gpu.Allocate1D(vector))
             {
                 var timer = Stopwatch.StartNew();
 
@@ -74,7 +73,7 @@ namespace GpuSandbox.Benchmarks
                 gpu.Synchronize();
                 Util.PrintPerformance(timer, "AddVector.IlGpu", 3, m, n);
 
-                cudaMatrix.CopyTo(matrix, 0, 0, matrix.Length);
+                cudaMatrix.CopyToCPU(matrix);
             }
         }
 
@@ -89,7 +88,7 @@ namespace GpuSandbox.Benchmarks
             }
         }
         
-        private static void IlGpuKernel(ArrayView<Real> matrix, ArrayView<Real> vector, int m, int n)
+        private static void IlGpuKernel(ArrayView1D<Real, Stride1D.Dense> matrix, ArrayView1D<Real, Stride1D.Dense> vector, int m, int n)
         {
             var i = Grid.IdxY * Group.DimY + Group.IdxY;
             var j = Grid.IdxX * Group.DimX + Group.IdxX;

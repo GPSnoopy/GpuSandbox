@@ -4,7 +4,6 @@ using Alea;
 using Alea.CSharp;
 using ILGPU;
 using ILGPU.Runtime;
-using ILGPU.Runtime.Cuda;
 
 #if DOUBLE_PRECISION
     using Real = System.Double;
@@ -97,14 +96,14 @@ namespace GpuSandbox.Benchmarks
         }
 
         public static void IlGpu(
-            CudaAccelerator gpu,
+            Accelerator gpu,
             Real[] mSquaredDistances,
             Real[] mCoordinates,
             int c,
             int n)
         {
-            using var cudaSquaredDistance = gpu.Allocate(mSquaredDistances);
-            using var cudaCoordinates = gpu.Allocate(mCoordinates);
+            using var cudaSquaredDistance = gpu.Allocate1D(mSquaredDistances);
+            using var cudaCoordinates = gpu.Allocate1D(mCoordinates);
             var timer = Stopwatch.StartNew();
 
             const int blockSize = 128;
@@ -117,7 +116,7 @@ namespace GpuSandbox.Benchmarks
 
             Util.PrintPerformance(timer, "SquaredDistance.IlGpu", n, c, n);
 
-            cudaSquaredDistance.CopyTo(mSquaredDistances, 0, 0, mSquaredDistances.Length);
+            cudaSquaredDistance.CopyToCPU(mSquaredDistances);
         }
 
         public static void AleaSharedMemory(
@@ -131,7 +130,7 @@ namespace GpuSandbox.Benchmarks
         }
 
         public static void IlGpuSharedMemory(
-            CudaAccelerator gpu,
+            Accelerator gpu,
             Real[] mSquaredDistances,
             Real[] mCoordinates,
             int c,
@@ -153,7 +152,7 @@ namespace GpuSandbox.Benchmarks
         }
 
         public static void IlGpuFloat2(
-            CudaAccelerator gpu,
+            Accelerator gpu,
             Real[] mSquaredDistances,
             Real[] mCoordinates,
             int c,
@@ -177,7 +176,7 @@ namespace GpuSandbox.Benchmarks
         }
 
         public static void IlGpuConstants(
-            CudaAccelerator gpu,
+            Accelerator gpu,
             Real[] mSquaredDistances,
             Real[] mCoordinates,
             int c,
@@ -201,7 +200,7 @@ namespace GpuSandbox.Benchmarks
         }
 
         public static void IlGpuLocalMemory(
-            CudaAccelerator gpu,
+            Accelerator gpu,
             Real[] mSquaredDistances,
             Real[] mCoordinates,
             int c,
@@ -266,18 +265,18 @@ namespace GpuSandbox.Benchmarks
         }
 
         private static void IlGpuOptimisedImpl<TInt>(
-            CudaAccelerator gpu,
+            Accelerator gpu,
             Real[] mSquaredDistances,
             Real[] mCoordinates,
             int c,
             int n,
             string name,
-            Action<ArrayView2D<Real>, ArrayView<Real>, TInt, int> kernelFunc,
+            Action<ArrayView2D<Real, Stride2D.DenseX>, ArrayView1D<Real, Stride1D.Dense>, TInt, int> kernelFunc,
             Func<int, TInt> numCoordGetter)
         where TInt : struct
         {
-            using var cudaSquaredDistance = gpu.Allocate<Real>(n, n);
-            using var cudaCoordinates = gpu.Allocate(mCoordinates);
+            using var cudaSquaredDistance = gpu.Allocate2DDenseX<Real>((n, n));
+            using var cudaCoordinates = gpu.Allocate1D(mCoordinates);
             var timer = Stopwatch.StartNew();
 
             const int blockSize = 128;
@@ -289,20 +288,20 @@ namespace GpuSandbox.Benchmarks
 
             Util.PrintPerformance(timer, name, n, c, n);
 
-            cudaSquaredDistance.CopyTo(mSquaredDistances, (0, 0), 0, (n, n));
+            cudaSquaredDistance.View.As1DView(new Stride1D.Dense()).CopyToCPU(mSquaredDistances);
         }
 
         private static void IlGpuOptimisedImpl(
-            CudaAccelerator gpu,
+            Accelerator gpu,
             Real[] mSquaredDistances,
             Real[] mCoordinates,
             int c,
             int n,
             string name,
-            Action<ArrayView2D<Real>, ArrayView<Real>, SpecializedValue<int>, SpecializedValue<int>, int> kernelFunc)
+            Action<ArrayView2D<Real, Stride2D.DenseX>, ArrayView1D<Real, Stride1D.Dense>, SpecializedValue<int>, SpecializedValue<int>, int> kernelFunc)
         {
-            using var cudaSquaredDistance = gpu.Allocate<Real>(n, n);
-            using var cudaCoordinates = gpu.Allocate(mCoordinates);
+            using var cudaSquaredDistance = gpu.Allocate2DDenseX<Real>((n, n));
+            using var cudaCoordinates = gpu.Allocate1D(mCoordinates);
             var timer = Stopwatch.StartNew();
 
             const int blockSize = 128;
@@ -314,7 +313,7 @@ namespace GpuSandbox.Benchmarks
 
             Util.PrintPerformance(timer, name, n, c, n);
 
-            cudaSquaredDistance.CopyTo(mSquaredDistances, (0, 0), 0, (n, n));
+            cudaSquaredDistance.AsArrayView<Real>(0, n * n).CopyToCPU(mSquaredDistances);
         }
 
         private static void AleaKernel(
@@ -346,8 +345,8 @@ namespace GpuSandbox.Benchmarks
         }
 
         private static void IlGpuKernel(
-            ArrayView<Real> mSquaredDistances,
-            ArrayView<Real> mCoordinates,
+            ArrayView1D<Real, Stride1D.Dense> mSquaredDistances,
+            ArrayView1D<Real, Stride1D.Dense> mCoordinates,
             int c,
             int n)
         {
@@ -438,8 +437,8 @@ namespace GpuSandbox.Benchmarks
         }
 
         private static void IlGpuKernelSharedMemory(
-            ArrayView2D<Real> mSquaredDistances,
-            ArrayView<Real> mCoordinates,
+            ArrayView2D<Real, Stride2D.DenseX> mSquaredDistances,
+            ArrayView1D<Real, Stride1D.Dense> mCoordinates,
             int c,
             int n)
         {
@@ -459,8 +458,8 @@ namespace GpuSandbox.Benchmarks
             // too small and not enough blocks get schedule per SM.
 
             var shared = SharedMemory.GetDynamic<Real>();
-            var coordinatesI = shared.GetSubView(0, c * Group.DimX);
-            var coordinatesJ = shared.GetSubView(c * Group.DimX);
+            var coordinatesI = shared.SubView(0, c * Group.DimX);
+            var coordinatesJ = shared.SubView(c * Group.DimX);
 
             var bI = Grid.IdxY * Group.DimX;
             var bJ = Grid.IdxX * Group.DimX;
@@ -560,16 +559,16 @@ namespace GpuSandbox.Benchmarks
         }
 
         private static void IlGpuKernelFloat2(
-            ArrayView2D<Real> mSquaredDistances,
-            ArrayView<Real> mCoordinates,
+            ArrayView2D<Real, Stride2D.DenseX> mSquaredDistances,
+            ArrayView1D<Real, Stride1D.Dense> mCoordinates,
             int c,
             int n)
         {
             // Same as KernelSharedMemory, but one thread does two element in one by using float2 reads.
 
             var shared = SharedMemory.GetDynamic<Real>();
-            var coordinatesI = shared.GetSubView(0, c * Group.DimX);
-            var coordinatesJ = shared.GetSubView(c * Group.DimX);
+            var coordinatesI = shared.SubView(0, c * Group.DimX);
+            var coordinatesJ = shared.SubView(c * Group.DimX);
 
             var bI = Grid.IdxY * Group.DimX;
             var bJ = Grid.IdxX * Group.DimX;
@@ -675,8 +674,8 @@ namespace GpuSandbox.Benchmarks
         }
 
         private static void IlGpuKernelConstants(
-            ArrayView2D<Real> mSquaredDistances,
-            ArrayView<Real> mCoordinates,
+            ArrayView2D<Real, Stride2D.DenseX> mSquaredDistances,
+            ArrayView1D<Real, Stride1D.Dense> mCoordinates,
             SpecializedValue<int> c,
             int n)
         {
@@ -684,8 +683,8 @@ namespace GpuSandbox.Benchmarks
             // Also, we write the results as float2.
 
             var shared = SharedMemory.GetDynamic<Real>();
-            var coordinatesI = shared.GetSubView(0, c * Group.DimX);
-            var coordinatesJ = shared.GetSubView(c * Group.DimX);
+            var coordinatesI = shared.SubView(0, c * Group.DimX);
+            var coordinatesJ = shared.SubView(c * Group.DimX);
 
             var bI = Grid.IdxY * Group.DimX;
             var bJ = Grid.IdxX * Group.DimX;
@@ -725,7 +724,7 @@ namespace GpuSandbox.Benchmarks
                         dist += diff * diff;
                     }
 
-                    var dst = mSquaredDistances.Cast<IlReal2>();
+                    var dst = mSquaredDistances.Cast<Real, IlReal2>();
                     dst[bJ / 2 + tid, bI + i] = dist;
                 }
             }
@@ -789,8 +788,8 @@ namespace GpuSandbox.Benchmarks
         }
 
         private static void IlGpuKernelLocalMemory(
-            ArrayView2D<Real> mSquaredDistances,
-            ArrayView<Real> mCoordinates,
+            ArrayView2D<Real, Stride2D.DenseX> mSquaredDistances,
+            ArrayView1D<Real, Stride1D.Dense> mCoordinates,
             SpecializedValue<int> dimX,
             SpecializedValue<int> c,
             int n)
@@ -815,7 +814,7 @@ namespace GpuSandbox.Benchmarks
 
                 if (isActive)
                 {
-                    var mCoordinates2 = mCoordinates.Cast<IlReal2>();
+                    var mCoordinates2 = mCoordinates.Cast<Real, IlReal2>();
                     coordinatesJ[k] = mCoordinates2[(k * n + bJ) / 2 + tid];
                 }
             }
@@ -837,7 +836,7 @@ namespace GpuSandbox.Benchmarks
                         dist += diff * diff;
                     }
 
-                    var dst = mSquaredDistances.Cast<IlReal2>();
+                    var dst = mSquaredDistances.Cast<Real, IlReal2>();
                     dst[bJ / 2 + tid, bI + i] = dist;
                 }
             }

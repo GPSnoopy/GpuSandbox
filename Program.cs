@@ -1,11 +1,13 @@
 ﻿//#define USE_ALEA
 
 using System;
+using System.Linq;
 using Alea;
 using GpuSandbox.Benchmarks;
-using ILGPU.IR.Transformations;
+using ILGPU;
+using ILGPU.Runtime;
 using ILGPU.Runtime.Cuda;
-
+using ILGPU.Runtime.OpenCL;
 #if DOUBLE_PRECISION
     using Real = System.Double;
 #else
@@ -21,25 +23,36 @@ namespace GpuSandbox
             try
             {
 #if USE_ALEA
-                Device.Default.Print();
+                Alea.Device.Default.Print();
+                using var aleaGpu = Gpu.Default;
+#else
+                var aleaGpu = (Gpu) null;
 #endif
                 Console.WriteLine();
 
-                using var context = new ILGPU.Context(OptimizationLevel.O2);
-                using var aleaGpu = Gpu.Default;
+                using var context = ILGPU.Context.Create(b => b
+                    .Optimize(OptimizationLevel.O2)
+                    .OpenCL());
 
-                using var ilGpu = new CudaAccelerator(context);
+                foreach (var device in context)
+                {
+                    device.PrintInformation(Console.Out);
+                    Console.WriteLine();
+                }
+
+                using var ilGpu = context.Devices.Any(d => d.AcceleratorType == AcceleratorType.Cuda) 
+                    ? (Accelerator) context.CreateCudaAccelerator(0)
+                    : context.CreateCLAccelerator(0);
 
                 RunAddVector(aleaGpu, ilGpu);
                 RunIntraReturn(aleaGpu, ilGpu);
                 RunSquaredDistance(aleaGpu, ilGpu);
-                RunMatrixMultiplication(aleaGpu, ilGpu);
-                RunManyMatrixMultiplication(aleaGpu, ilGpu);
 
-                // ILGPU remarks:
-                // - Allocate and copy extension methods?
-                // - Allocate 64-bits / long size?
-                // - Access to additional CUDA intrinsics.
+                if (ilGpu is CudaAccelerator ilGpuCuda)
+                {
+                    RunMatrixMultiplication(aleaGpu, ilGpuCuda);
+                    RunManyMatrixMultiplication(aleaGpu, ilGpuCuda);
+                }
             }
 
             catch (Exception exception)
@@ -52,7 +65,7 @@ namespace GpuSandbox
             }
         }
 
-        private static void RunAddVector(Gpu aleaGpu, CudaAccelerator ilGpu)
+        private static void RunAddVector(Gpu aleaGpu, Accelerator ilGpu)
         {
             const int m = 2 * 24 * 12;
             const int n = 2 * 25600 - 1;
@@ -72,7 +85,7 @@ namespace GpuSandbox
                 () => AddVector.IlGpu(ilGpu, matrixC, vector, m, n));
         }
 
-        private static void RunIntraReturn(Gpu aleaGpu, CudaAccelerator ilGpu)
+        private static void RunIntraReturn(Gpu aleaGpu, Accelerator ilGpu)
         {
             const int m = 2 * 24 * 12;
             const int n = 2 * 25600 - 1;
@@ -94,7 +107,7 @@ namespace GpuSandbox
                 () => IntraReturn.IlGpu(ilGpu, matrixC, vector1, vector2, vector3, m, n));
         }
 
-        private static void RunSquaredDistance(Gpu aleaGpu, CudaAccelerator ilGpu)
+        private static void RunSquaredDistance(Gpu aleaGpu, Accelerator ilGpu)
         {
             const int c = 20;
             const int x = 2 * 10000;

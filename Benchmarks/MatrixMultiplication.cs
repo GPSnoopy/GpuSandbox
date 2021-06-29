@@ -73,9 +73,9 @@ namespace GpuSandbox.Benchmarks
 
         public static void IlGpu(CudaAccelerator gpu, Real[] result, Real[] left, Real[] right, int n)
         {
-            using (var cudaResult = gpu.Allocate(result))
-            using (var cudaLeft = gpu.Allocate(left))
-            using (var cudaRight = gpu.Allocate(right))
+            using (var cudaResult = gpu.Allocate1D(result))
+            using (var cudaLeft = gpu.Allocate1D(left))
+            using (var cudaRight = gpu.Allocate1D(right))
             {
                 using var blas = new CuBlas(gpu, CuBlasAPIVersion.V11);
 
@@ -93,7 +93,7 @@ namespace GpuSandbox.Benchmarks
 
                 PrintPerformance(timer, "MatrixMultiplication.IlGpu.cuBLAS", n, n, n);
 
-                cudaResult.CopyTo(result, 0, 0, result.Length);
+                cudaResult.CopyToCPU(result);
             }
         }
 

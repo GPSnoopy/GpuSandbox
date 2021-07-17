@@ -1,11 +1,11 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFrameworks>net48</TargetFrameworks>
+    <TargetFramework>net5.0</TargetFramework>
     <PlatformTarget>x64</PlatformTarget>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <DebugSymbols>true</DebugSymbols>
-    <LangVersion>8.0</LangVersion>
+    <LangVersion>latest</LangVersion>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
     <DebugType>pdbonly</DebugType>
@@ -17,9 +17,7 @@
     <None Remove=".gitignore" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Alea" Version="3.0.4" />
-    <PackageReference Include="FSharp.Core" Version="5.0.2" />
-    <PackageReference Include="ILGPU" Version="1.0.0-beta2" />
+	  <PackageReference Include="ILGPU" Version="1.0.0-beta2" />
     <PackageReference Include="ILGPU.Algorithms" Version="1.0.0-beta2" />
   </ItemGroup>
 </Project>

@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Diagnostics;
-using Alea;
 using ILGPU.Runtime;
 using ILGPU.Runtime.Cuda;
 
@@ -47,31 +46,7 @@ namespace GpuSandbox.Benchmarks
             PrintPerformance(timer, "MatrixMultiplication.Managed", n, n, n);
         }
 
-        public static void Alea(Gpu gpu, Real[] result, Real[] left, Real[] right, int n)
-        {
-            using (var cudaResult = gpu.AllocateDevice(result))
-            using (var cudaLeft = gpu.AllocateDevice(left))
-            using (var cudaRight = gpu.AllocateDevice(right))
-            {
-                var timer = Stopwatch.StartNew();
-
-                global::Alea.cuBLAS.Blas.Get(gpu).Gemm(
-                    global::Alea.cuBLAS.Operation.N,
-                    global::Alea.cuBLAS.Operation.N,
-                    n, n, n,
-                    1, cudaLeft.Ptr, n,
-                    cudaRight.Ptr, n, 0,
-                    cudaResult.Ptr, n);
-
-                gpu.Synchronize();
-
-                PrintPerformance(timer, "MatrixMultiplication.Alea.cuBLAS", n, n, n);
-
-                Gpu.Copy(cudaResult, result);
-            }
-        }
-
-        public static void IlGpu(CudaAccelerator gpu, Real[] result, Real[] left, Real[] right, int n)
+        public static void Gpu(CudaAccelerator gpu, Real[] result, Real[] left, Real[] right, int n)
         {
             using (var cudaResult = gpu.Allocate1D(result))
             using (var cudaLeft = gpu.Allocate1D(left))
@@ -91,7 +66,7 @@ namespace GpuSandbox.Benchmarks
 
                 gpu.Synchronize();
 
-                PrintPerformance(timer, "MatrixMultiplication.IlGpu.cuBLAS", n, n, n);
+                PrintPerformance(timer, "MatrixMultiplication.Gpu.cuBLAS", n, n, n);
 
                 cudaResult.CopyToCPU(result);
             }

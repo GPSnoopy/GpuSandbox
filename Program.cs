@@ -1,7 +1,11 @@
-﻿//#define USE_ALEA
+﻿#if NETFRAMEWORK
+//#define USE_ALEA
+#endif
 
 using System;
+using System.Diagnostics;
 using System.Linq;
+using System.Threading.Tasks;
 using Alea;
 using GpuSandbox.Benchmarks;
 using ILGPU;
@@ -32,6 +36,7 @@ namespace GpuSandbox
 
                 using var context = ILGPU.Context.Create(b => b
                     .Optimize(OptimizationLevel.O2)
+                    .Cuda()
                     .OpenCL());
 
                 foreach (var device in context)
@@ -157,7 +162,9 @@ namespace GpuSandbox
                 () => MatrixMultiplication.Initialise(left, right, n),
                 () => AssertAreEqual(resultM, resultC, n, n),
                 () => MatrixMultiplication.Managed(resultM, left, right, n),
+#if USE_ALEA
                 () => MatrixMultiplication.Alea(aleaGpu, resultC, left, right, n),
+#endif
                 () => MatrixMultiplication.IlGpu(ilGpu, resultC, left, right, n));
         }
 
@@ -175,15 +182,23 @@ namespace GpuSandbox
                 () => ManyMatrixMultiplication.Initialise(left, right, m, n),
                 () => ManyMatrixMultiplication.Initialise(left, right, m, n),
                 () => AssertAreEqual(resultM, resultC, m * n, n),
-                () => ManyMatrixMultiplication.Managed(resultM, left, right, m, n),
-                () => ManyMatrixMultiplication.Alea(aleaGpu, resultC, left, right, m, n));
+                () => ManyMatrixMultiplication.Managed(resultM, left, right, m, n)
+#if USE_ALEA
+                ,() => ManyMatrixMultiplication.Alea(aleaGpu, resultC, left, right, m, n)
+#endif
+                );
         }
 
         private static void AssertAreEqual(Real[] left, Real[] right, int m, int n)
         {
+            var timer = Stopwatch.StartNew();
+
+            if (left.Length != right.Length) throw new ArgumentException($"left length is different from right length ({left.Length} != {right.Length})");
+            if (left.Length != m * n) throw new ArgumentException($"array lengths do not match dimension arguments ({left.Length} != {m * n})");
+
             var e = typeof(Real) == typeof(float) ? 1e-5 : 1e-12;
 
-            for (int i = 0; i != m; ++i)
+            Parallel.For(0, m, i =>
             {
                 for (int j = 0; j != n; ++j)
                 {
@@ -194,7 +209,9 @@ namespace GpuSandbox
                     if (d > e && d / Math.Min(a + b, Real.MaxValue) > e)
                         throw new Exception(left[i * n + j] + " != " + right[i * n + j] + " [" + i + ", " + j + "]");
                 }
-            }
+            });
+
+            Console.WriteLine($"-- AssertAreEqual: {timer.Elapsed.TotalMilliseconds} ms");
         }
 
         private const int Loops = 10;

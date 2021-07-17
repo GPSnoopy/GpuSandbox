@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Diagnostics;
 using System.Linq;
-using Alea;
 
 #if DOUBLE_PRECISION
     using Real = System.Double;
@@ -66,65 +65,65 @@ namespace GpuSandbox.Benchmarks
             }
         }
 
-        public static unsafe void Alea(Gpu gpu, Real[] result, Real[] left, Real[] right, int m, int n)
-        {
-            using (var cudaResult = gpu.AllocateDevice(result))
-            using (var cudaLeft = gpu.AllocateDevice(left))
-            using (var cudaRight = gpu.AllocateDevice(right))
-            {
-                var alphas = new Real[] { 1 };
-                var betas = new Real[] { 0 };
-                var results = Enumerable.Range(0, m).Select(i => cudaResult.Ptr.Handle + i * n * n * sizeof(Real)).ToArray();
-                var lefts = Enumerable.Range(0, m).Select(i => cudaLeft.Ptr.Handle + i * n * n * sizeof(Real)).ToArray();
-                var rights = Enumerable.Range(0, m).Select(i => cudaRight.Ptr.Handle).ToArray();
+//        public static unsafe void Alea(Gpu gpu, Real[] result, Real[] left, Real[] right, int m, int n)
+//        {
+//            using (var cudaResult = gpu.AllocateDevice(result))
+//            using (var cudaLeft = gpu.AllocateDevice(left))
+//            using (var cudaRight = gpu.AllocateDevice(right))
+//            {
+//                var alphas = new Real[] { 1 };
+//                var betas = new Real[] { 0 };
+//                var results = Enumerable.Range(0, m).Select(i => cudaResult.Ptr.Handle + i * n * n * sizeof(Real)).ToArray();
+//                var lefts = Enumerable.Range(0, m).Select(i => cudaLeft.Ptr.Handle + i * n * n * sizeof(Real)).ToArray();
+//                var rights = Enumerable.Range(0, m).Select(i => cudaRight.Ptr.Handle).ToArray();
 
-                using (var cudaResults = gpu.AllocateDevice(results))
-                using (var cudaLefts = gpu.AllocateDevice(lefts))
-                using (var cudaRights = gpu.AllocateDevice(rights))
-                {
-                    fixed (Real* pAlphas = alphas)
-                    fixed (Real* pBetas = betas)
-                    {
-                        var timer = Stopwatch.StartNew();
+//                using (var cudaResults = gpu.AllocateDevice(results))
+//                using (var cudaLefts = gpu.AllocateDevice(lefts))
+//                using (var cudaRights = gpu.AllocateDevice(rights))
+//                {
+//                    fixed (Real* pAlphas = alphas)
+//                    fixed (Real* pBetas = betas)
+//                    {
+//                        var timer = Stopwatch.StartNew();
 
-                        var blas = global::Alea.cuBLAS.Blas.Get(gpu);
-                        var lAlphas = pAlphas;
-                        var lBetas = pBetas;
+//                        var blas = global::Alea.cuBLAS.Blas.Get(gpu);
+//                        var lAlphas = pAlphas;
+//                        var lBetas = pBetas;
 
-                        gpu.EvalAction(() =>
-                            global::Alea.cuBLAS.Interop.cublasSafeCall(
-#if DOUBLE_PRECISION
-                            global::Alea.cuBLAS.Interop.cublasDgemmBatched(
-#else
-                                global::Alea.cuBLAS.Interop.cublasSgemmBatched(
-#endif
-                                    blas.Handle,
-                                    global::Alea.cuBLAS.Operation.N,
-                                    global::Alea.cuBLAS.Operation.N,
-                                    n,
-                                    n,
-                                    n,
-                                    lAlphas,
-                                    // ReSharper disable AccessToDisposedClosure
-                                    cudaLefts.Ptr.Handle,
-                                    n,
-                                    cudaRights.Ptr.Handle,
-                                    n,
-                                    lBetas,
-                                    cudaResults.Ptr.Handle,
-                                    // ReSharper restore AccessToDisposedClosure
-                                    n,
-                                    m)));
+//                        gpu.EvalAction(() =>
+//                            global::Alea.cuBLAS.Interop.cublasSafeCall(
+//#if DOUBLE_PRECISION
+//                            global::Alea.cuBLAS.Interop.cublasDgemmBatched(
+//#else
+//                                global::Alea.cuBLAS.Interop.cublasSgemmBatched(
+//#endif
+//                                    blas.Handle,
+//                                    global::Alea.cuBLAS.Operation.N,
+//                                    global::Alea.cuBLAS.Operation.N,
+//                                    n,
+//                                    n,
+//                                    n,
+//                                    lAlphas,
+//                                    // ReSharper disable AccessToDisposedClosure
+//                                    cudaLefts.Ptr.Handle,
+//                                    n,
+//                                    cudaRights.Ptr.Handle,
+//                                    n,
+//                                    lBetas,
+//                                    cudaResults.Ptr.Handle,
+//                                    // ReSharper restore AccessToDisposedClosure
+//                                    n,
+//                                    m)));
 
-                        gpu.Synchronize();
+//                        gpu.Synchronize();
 
-                        PrintPerformance(timer, "ManyMatrixMultiplication.cuBLAS", m * n, n, n);
+//                        PrintPerformance(timer, "ManyMatrixMultiplication.cuBLAS", m * n, n, n);
 
-                        Gpu.Copy(cudaResult, result);
-                    }
-                }
-            }
-        }
+//                        Gpu.Copy(cudaResult, result);
+//                    }
+//                }
+//            }
+//        }
 
         private static void PrintPerformance(Stopwatch timer, string prefix, int numOps, int m, int n)
         {

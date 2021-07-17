@@ -191,8 +191,6 @@ namespace GpuSandbox
 
         private static void AssertAreEqual(Real[] left, Real[] right, int m, int n)
         {
-            var timer = Stopwatch.StartNew();
-
             if (left.Length != right.Length) throw new ArgumentException($"left length is different from right length ({left.Length} != {right.Length})");
             if (left.Length != m * n) throw new ArgumentException($"array lengths do not match dimension arguments ({left.Length} != {m * n})");
 
@@ -210,8 +208,6 @@ namespace GpuSandbox
                         throw new Exception(left[i * n + j] + " != " + right[i * n + j] + " [" + i + ", " + j + "]");
                 }
             });
-
-            Console.WriteLine($"-- AssertAreEqual: {timer.Elapsed.TotalMilliseconds} ms");
         }
 
         private const int Loops = 10;

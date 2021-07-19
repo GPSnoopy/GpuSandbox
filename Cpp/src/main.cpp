@@ -24,7 +24,7 @@ namespace
 	void run_add_vector();
 	void run_intra_return();
 	void run_squared_distance();
-	void run(int loops, function<void()> baseInitialise, function<void()> testInitialise, function<void()> compare, function<void()> baseRun, const vector<function<void()>>& testRuns);
+	void run(int loops, const function<void()>& baseInitialise, const function<void()>& testInitialise, const function<void()>& compare, const function<void()>& baseRun, const vector<function<void()>>& testRuns);
 	void assert_are_equal(const Array& left, const Array& right, int m, int n);
 }
 
@@ -63,6 +63,15 @@ namespace
 
 	void initialize_cuda(const int selected_device)
 	{
+		int runtimeVersion;
+		int driverVersion;
+
+		CudaCheck(cudaDriverGetVersion(&driverVersion));
+		CudaCheck(cudaRuntimeGetVersion(&runtimeVersion));
+
+		cout << "CUDA Driver Version: " << driverVersion / 1000 << "." << driverVersion % 1000 << endl;
+		cout << "CUDA Runtime Version: " << runtimeVersion / 1000 << "." << runtimeVersion % 1000 << endl;
+		cout << endl;
 		cout << "Available CUDA devices: " << endl;
 
 		int deviceCount = 0;
@@ -148,7 +157,13 @@ namespace
 		});
 	}
 
-	void run(int loops, function<void()> baseInitialise, function<void()> testInitialise, function<void()> compare, function<void()> baseRun, const vector<function<void()>>& testRuns)
+	void run(
+		int loops, 
+		const function<void()>& baseInitialise, 
+		const function<void()>& testInitialise, 
+		const function<void()>& compare, 
+		const function<void()>& baseRun, 
+		const vector<function<void()>>& testRuns)
 	{
 		//for (int i = 0; i != loops; ++i)
 		{
@@ -173,7 +188,7 @@ namespace
 
 	void assert_are_equal(const Array& left, const Array& right, const int m, const int n)
 	{
-		const Real e = sizeof(Real) == 4 ? 1e-5f : 1e-12;
+		const Real e = sizeof(Real) == 4 ? static_cast<Real>(1e-5f) : static_cast<Real>(1e-12);
 
 		for (int i = 0; i != m; ++i)
 		{

@@ -24,7 +24,7 @@ namespace
 		CudaCheck(cudaMemcpy(pCoordinates, mCoordinates.data(), mCoordinates.size() * sizeof(Real), cudaMemcpyKind::cudaMemcpyHostToDevice));
 		CudaCheck(cudaDeviceSynchronize());
 
-		auto begin = steady_clock::now();
+		const auto begin = steady_clock::now();
 
 		int blockSize = 128;
 		int gridSize = div_up(n, blockSize);
@@ -144,8 +144,8 @@ namespace
 		const auto coordinatesI = shared;
 		const auto coordinatesJ = shared + c * blockDim.x;
 
-		int bI = blockIdx.y * blockDim.x;
-		int bJ = blockIdx.x * blockDim.x;
+		const int bI = blockIdx.y * blockDim.x;
+		const int bJ = blockIdx.x * blockDim.x;
 
 		for (int k = 0; k != c; ++k)
 		{
@@ -200,11 +200,11 @@ namespace
 
 		extern __shared__  Real shared[];
 
-		auto coordinatesI = shared;
-		auto coordinatesJ = shared + c * blockDim.x;
+		const auto coordinatesI = shared;
+		const auto coordinatesJ = shared + c * blockDim.x;
 
-		int bI = blockIdx.y * blockDim.x;
-		int bJ = blockIdx.x * blockDim.x;
+		const int bI = blockIdx.y * blockDim.x;
+		const int bJ = blockIdx.x * blockDim.x;
 
 		for (int k = 0; k != c; ++k)
 		{
@@ -221,17 +221,12 @@ namespace
 
 		__syncthreads();
 
-		int line = threadIdx.x / (blockDim.x / 2);
-		int tid = threadIdx.x % (blockDim.x / 2);
-
-		int msdo = (bI + line) * n + (bJ + 2 * tid);
-		int n2 = n * 2;
-		int bd2 = blockDim.x * 2;
-		int bd4 = blockDim.x * 4;
+		const int line = threadIdx.x / (blockDim.x / 2);
+		const int tid = threadIdx.x % (blockDim.x / 2);
 
 		if (bJ + tid * 2 < n)
 		{
-			const auto coordinatesJ2 = (const Real2*)coordinatesJ;
+			const auto coordinatesJ2 = (float2*)coordinatesJ;
 
 			for (int i = line; i < blockDim.x && bI + i < n; i += 2)
 			{
@@ -340,7 +335,7 @@ void SquaredDistance::initialise(Array& mSquaredDistances, Array& mCoordinates, 
 
 void SquaredDistance::native(Array& mSquaredDistances, const Array& mCoordinates, const int c, const int n)
 {
-	auto begin = steady_clock::now();
+	const auto begin = steady_clock::now();
 
 	for (int i = 0; i != n; ++i)
 	{
@@ -350,9 +345,9 @@ void SquaredDistance::native(Array& mSquaredDistances, const Array& mCoordinates
 
 			for (int k = 0; k != c; ++k)
 			{
-				Real coord1 = mCoordinates[k * n + i];
-				Real coord2 = mCoordinates[k * n + j];
-				Real diff = coord1 - coord2;
+				const Real coord1 = mCoordinates[k * n + i];
+				const Real coord2 = mCoordinates[k * n + j];
+				const Real diff = coord1 - coord2;
 
 				dist += diff * diff;
 			}

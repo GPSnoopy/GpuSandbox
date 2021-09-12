@@ -36,14 +36,14 @@ namespace GpuSandbox
                     ? (Accelerator) context.CreateCudaAccelerator(0)
                     : context.CreateCLAccelerator(0);
 
-                //RunAddVector(gpu);
-                //RunIntraReturn(gpu);
+                RunAddVector(gpu);
+                RunIntraReturn(gpu);
                 RunSquaredDistance(gpu);
 
                 if (gpu is CudaAccelerator gpuCuda)
                 {
-                    //RunMatrixMultiplication(gpuCuda);
-                    //RunManyMatrixMultiplication(gpuCuda);
+                    RunMatrixMultiplication(gpuCuda);
+                    RunManyMatrixMultiplication(gpuCuda);
                 }
             }
 
